@@ -30,7 +30,64 @@
 #ifdef CRYPTO_EXAMPLE
 
 // OUR Security realted files using wolfSSL
-#include "security_utils.h"
+// #include "security_utils.h" can do this but printing becomes an issue...so rather inlcude secrets.h here
+#include "secrets.h"
+
+
+void print_key(const uint8_t *key, size_t length) {
+    // Max 3 chars per byte (e.g., "ff:"), plus one for '\0'
+    char buffer[32 * 3 + 1];
+    size_t offset = 0;
+
+    for (size_t i = 0; i < length; ++i) {
+        offset += snprintf(buffer + offset, sizeof(buffer) - offset,
+                           (i < length - 1) ? "%02x:" : "%02x", key[i]);
+        if (offset >= sizeof(buffer) - 1) break; // Avoid buffer overrun
+    }
+
+    buffer[offset] = '\0'; // Just in case
+    print_debug(buffer);
+}
+
+int debug_secrets() {
+
+    print_debug("$$$$$$$$$$$$$$$$$$$$$$$$ Valid Channels: ");
+    for (int i = 0; i < NUM_CHANNELS; ++i) {
+        char buf[8];
+        snprintf(buf, sizeof(buf), "%d ", VALID_CHANNELS[i]);
+        print_debug(buf);
+    }
+    print_debug("\n");
+
+    print_debug("Root Key:");
+    print_key(ROOT_KEY, 32);
+
+    print_debug("Subscription Key:");
+    print_key(SUBSCRIPTION_KEY, 32);
+
+    print_debug("Channel 0 Key:");
+    print_key(CHANNEL_0_KEY, 32);
+
+    print_debug("Channel 1 Key:");
+    print_key(CHANNEL_1_KEY, 32);
+
+    print_debug("Channel 3 Key:");
+    print_key(CHANNEL_3_KEY, 32);
+
+    print_debug("Channel 4 Key:");
+    print_key(CHANNEL_4_KEY, 32);
+
+    print_debug("Encoder Public Key:");
+    print_debug(ENCODER_PUBLIC_KEY);
+
+    print_debug("Decoder Private Key:");
+    print_debug(DECODER_PRIVATE_KEY);
+
+    print_debug("Signature Public Key:");
+    print_debug(SIGNATURE_PUBLIC_KEY);
+
+    return 0;
+}
 
 
 
@@ -412,9 +469,9 @@ int main(void) {
             #ifdef CRYPTO_EXAMPLE
                 // Run the crypto example
                 // TODO: Remove this from your design
-                crypto_example();
                 debug_secrets();
-                
+                crypto_example();
+
                 // if (debug_secrets()==-1){
                 //     STATUS_LED_ERROR();
                 //     print_error("Failed to read secrets\n");
