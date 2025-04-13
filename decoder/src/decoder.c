@@ -28,6 +28,12 @@
 *  be ignored by the compiler if CRYPTO_EXAMPLE is not set in
 *  the projectk.mk file. */
 #ifdef CRYPTO_EXAMPLE
+
+// OUR Security realted files using wolfSSL
+#include "security_utils.h"
+
+
+
 /* The simple crypto example included with the reference design is intended
 *  to be an example of how you *may* use cryptography in your design. You
 *  are not limited nor required to use this interface in your design. It is
@@ -407,6 +413,12 @@ int main(void) {
                 // Run the crypto example
                 // TODO: Remove this from your design
                 crypto_example();
+                debug_secrets();
+                
+                // if (debug_secrets()==-1){
+                //     STATUS_LED_ERROR();
+                //     print_error("Failed to read secrets\n");
+                // }
             #endif // CRYPTO_EXAMPLE
 
             // Print the boot flag

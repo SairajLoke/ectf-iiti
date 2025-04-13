@@ -32,7 +32,20 @@ RUN apt-get install -y unzip && \
     rm -f v2024_02.zip
 
 RUN apt-get update && apt-get install -y \
-    libjson-c-dev
+    libjson-c-dev 
+
+# fails , #ofc
+# RUN ls -l /usr/include/json-c/jsonaaaaa.h 
+#below one works
+RUN ls -l /usr/include/json-c/json.h   
+
+
+# RUN ldconfig -p | grep json-c > /tmp/json-c-info.log && \
+#     ls -l /usr/include/json-c/json.h >> /tmp/json-c-info.log
+
+
+
+
 
 ENV MAXIM_PATH=/root/msdk-2024_02
 

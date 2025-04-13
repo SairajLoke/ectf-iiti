@@ -420,6 +420,26 @@ ifeq "$(MAKECMDGOALS)" ""
 MAKECMDGOALS:=$(.DEFAULT_GOAL)
 endif
 
+#DEbugs cmds
+$(info PROJ_CFLAGS: $(PROJ_CFLAGS) \n)
+$(info LIBS: $(LIBS) \n)
+$(info VPATH: $(VPATH) \n)
+$(info IPATH: $(IPATH) \n)
+$(info SRCS: $(SRCS) \n)
+$(info LINKERFILE: $(LINKERFILE) \n)
+$(info LINKERPATH: $(LINKERPATH) \n)
+$(info TARGET: $(TARGET) \n)
+$(info TARGET_UC: $(TARGET_UC) \n)
+$(info TARGET_LC: $(TARGET_LC) \n)
+$(info MAKECMDGOALS: $(MAKECMDGOALS) \n)
+$(info MAKE_TERMOUT: $(MAKE_TERMOUT) \n)
+$(info FORCE_COLOR: $(FORCE_COLOR) \n)
+$(info SBT: $(SBT) \n)
+$(info SBT_CONFIG: $(SBT_CONFIG) \n)
+$(info SBT_CONFIG_FILE: $(SBT_CONFIG_FILE) \n)
+$(info SBT_CONFIG_FILE_PATH: $(SBT_CONFIG_FILE_PATH) \n)
+
+
 
 all:
 # 	Extend the functionality of the "all" recipe here

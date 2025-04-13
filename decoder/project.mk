@@ -42,6 +42,19 @@ CRYPTO_EXAMPLE=1
 
 #other libs that we may require
 # json-c--------------------------------
-LIBS += -ljson-c
-IPATH += /usr/include/json-c #for header files
+IPATH += /usr/include/json-c
+# PROJ_LDFLAGS += -ljson-c #nope
+
+# LINKERFILE += /usr/lib/x86_64-linux-gnu/libjson-c.so
+# PROJ_LDFLAGS += /usr/lib/x86_64-linux-gnu/libjson-c.so
+
+
+
+#-----------------------------------------
+# PROJ_CFLAGS += -ljson-c
+# LIBS += -ljson-c 
+# nope
+# PROJ_CFLAGS += -I/usr/include/
+# IPATH += json-c
+
 # ----------------------------------------
