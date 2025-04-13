@@ -1,3 +1,19 @@
+NOTE:
+
+some cmds
+1. python json2h.py (assumes secrets.json in secret folder, and secrets.h to be written in inc..trivial to change locs)
+2. docker run --rm -v ./decoder/:/decoder -v ./deadbeef_build:/out -e DECODER_ID=0xdeadbeef  build-decoder 
+3. that project.mk include not useful now..coz lit eliminated the need to use json-c
+
+(not putting the secrets here..but if the secret.h is put here..just like the ectf's run cmd, we need to update that path in project.mk file as well 
+eg 
+if cmd is 
+docker run --rm -v ./decoder/:/decoder -v ./secrets/secrets.h:/secrets.h:ro -v ./deadbeef_build:/out -e DECODER_ID=0xdeadbeef build-decoder 
+<!-- IPATH +=  / --> this doesnt work prolly..u'll end up putting lot of unnec in include
+<!--  -->
+)
+
+
 # eCTF Insecure Example
 
 This repository holds the insecure example design for an eCTF Satellite TV System.
