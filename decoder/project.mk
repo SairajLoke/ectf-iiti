@@ -35,12 +35,13 @@ ENTRY=firmware_startup
 # WolfSSL can be downloaded from: https://www.wolfssl.com/download/
 
 # Disable Crypto Example
-CRYPTO_EXAMPLE=0
+# CRYPTO_EXAMPLE=0
 
 # Enable Crypto Example
-#CRYPTO_EXAMPLE=1
+CRYPTO_EXAMPLE=1
 
 #other libs that we may require
-#json-c
-# LIBS += -ljson-c
-# IPATH += /usr/include/json-c #for header files
+# json-c--------------------------------
+LIBS += -ljson-c
+IPATH += /usr/include/json-c #for header files
+# ----------------------------------------

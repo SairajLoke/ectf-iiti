@@ -31,8 +31,8 @@ RUN apt-get install -y unzip && \
     unzip v2024_02.zip && \
     rm -f v2024_02.zip
 
-# RUN apt-get update && apt-get install -y \
-#     libjson-c-dev
+RUN apt-get update && apt-get install -y \
+    libjson-c-dev
 
 ENV MAXIM_PATH=/root/msdk-2024_02
 
