@@ -84,7 +84,7 @@ class Encoder:
         encrypted_frame = self.aes_encrypt(channel_keys[str(channel)], frame)
         encrypted_packet = self.ecdh(encoder_private_key, decoder_public_key, {"channel": channel, "timestamp": timestamp, "frame": encrypted_frame})
         signed_packet = signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
-        return signed_packet
+        return signed_packet + encrypted_frame
 
 
 def main():
