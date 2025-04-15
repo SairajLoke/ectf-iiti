@@ -32,10 +32,10 @@
 /* Code between this #ifdef and the subsequent #endif will
  *  be ignored by the compiler if CRYPTO_EXAMPLE is not set in
  *  the projectk.mk file. */
+#include "secrets.h"
 #ifdef CRYPTO_EXAMPLE
 // OUR Security realted files using wolfSSL
 // #include "security_utils.h" can do this but printing becomes an issue...so rather inlcude secrets.h here
-#include "secrets.h"
 #include "simple_crypto.h"
 #include "decrypto.h"
 /* The simple crypto example included with the reference design is intended
@@ -333,14 +333,16 @@ int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
 
 
 /* Helper function to handle PKCS7 padding removal */
-void remove_padding(uint8_t *data, int *len) {
-    int padding_len = data[*len - 1];
-    *len -= padding_len; // Adjust the length
-}
+// void remove_padding(uint8_t *data, int *len) {
+//     int padding_len = data[*len - 1];
+//     print_debug("Padding length: ");
+//     int2str(padding_len);
+//     *len -= padding_len; // Adjust the length
+// }
 
-void int2str(int num, char *str) {
+void int2str(int num) {
     int i = 0;
-    char pkt_len_buf [64];
+    char str [64];
     while (num != 0) {
         str[i++] = (num % 10) + '0';
         num /= 10;
@@ -352,7 +354,7 @@ void int2str(int num, char *str) {
         str[j] = str[i - j - 1];
         str[i - j - 1] = temp;
     }
-    print_debug(pkt_len_buf);
+    print_debug(str);
 }
 
 void print_subscription_packet(const subscription_update_packet_t *packet) {
@@ -371,8 +373,108 @@ void print_subscription_packet(const subscription_update_packet_t *packet) {
 }
 
 int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
+    print_debug("Processing subscription update...");
+    
+    // Extract the IV (first 16 bytes)
+    uint8_t iv[AES_BLOCK_SIZE];
+    memcpy(iv, uart_buf, AES_BLOCK_SIZE);
+    
+    // Get encrypted data portion
+    uint8_t *encrypted_data = uart_buf + AES_BLOCK_SIZE;
+    int encrypted_data_len = (int)pkt_len - AES_BLOCK_SIZE;
+    
+    // Initialize AES
+    Aes aes;
+    if (wc_AesInit(&aes, NULL, 0) != 0) {
+        print_debug("AES initialization failed\n");
+        return -1;
+    }
+    
+    // Set up decryption
+    if (wc_AesSetKey(&aes, SUBSCRIPTION_KEY, sizeof(SUBSCRIPTION_KEY), iv, AES_DECRYPTION) != 0) {
+        print_debug("Setting AES key failed\n");
+        return -1;
+    }
+    
+    // Decrypt the data
+    uint8_t decrypted_data[128]; // Make sure this is large enough
+    if (wc_AesCbcDecrypt(&aes, decrypted_data, encrypted_data, encrypted_data_len) != 0) {
+        print_debug("AES decryption failed\n");
+        return -1;
+    }
+    
+    // Clean up AES context
+    wc_AesFree(&aes);
+    
+    // Handle PKCS7 padding (manually for demonstration)
+    uint8_t padding_value = decrypted_data[encrypted_data_len - 1];
+    char padding_value_str[10];
+    sprintf("Padding value: %u\n", padding_value);
+
+    if (padding_value > AES_BLOCK_SIZE || padding_value == 0) {
+        print_debug("Invalid padding detected\n");
+        return -1;
+    }
+    
+    // Verify padding is consistent (all padding bytes have same value)
+    for (int i = encrypted_data_len - padding_value; i < encrypted_data_len; i++) {
+        if (decrypted_data[i] != padding_value) {
+            print_debug("Inconsistent padding\n");
+            return -1;
+        }
+    }
+    
+    // Calculate actual data length without padding
+    int actual_data_len = encrypted_data_len - padding_value;
+    
+    // Now extract the subscription details (similar to Python's struct.unpack)
+    // Expecting <IQQI = uint32 + uint64 + uint64 + uint32
+    if (actual_data_len < 24) { // 4 + 8 + 8 + 4 = 24 bytes minimum
+        print_debug("Decrypted data too short for subscription info\n");
+        return -1;
+    }
+    
+    uint32_t decoder_id;
+    uint64_t start_time;
+    uint64_t end_time;
+    uint32_t channel;
+    
+    // Extract values (assuming little-endian as in Python "<IQQI")
+    memcpy(&decoder_id, decrypted_data, sizeof(uint32_t));
+    memcpy(&start_time, decrypted_data + 4, sizeof(uint64_t));
+    memcpy(&end_time, decrypted_data + 12, sizeof(uint64_t));
+    memcpy(&channel, decrypted_data + 20, sizeof(uint32_t));
+    
+    // Debug output
+    char debug_msg[100];
+    sprintf(debug_msg, "Decoder ID: %u", decoder_id);
+    print_debug(debug_msg);
+    
+    sprintf(debug_msg, "Start Time: %llu", (unsigned long long)start_time);
+    print_debug(debug_msg);
+    
+    sprintf(debug_msg, "End Time: %llu", (unsigned long long)end_time);
+    print_debug(debug_msg);
+    
+    sprintf(debug_msg, "Channel: %u", channel);
+    print_debug(debug_msg);
+    
+
+    update_subscription(sizeof(subscription_update_packet_t), sub_packet);//to check
+    write_packet(SUBSCRIBE_MSG, NULL, 0); // Send an ACK message
+    return 0;
+}
+
+int handle_update_subscription_old(size_t pkt_len, uint8_t *uart_buf) {
     
     int2str(pkt_len);
+    // print_hex_debug(uart_buf, pkt_len);
+    char output[128];
+    sprintf(output, "%s", uart_buf);
+    output[pkt_len] = '\0'; // Null-terminate the string
+    print_debug("UART buffer: ");
+    print_debug(output);
+
     // if( pkt_len == 80){print_debug("Yes, 80 bytes");}
     // else if (pkt_len < 80){print_debug("No, less than 80 bytes");}
     // else if (pkt_len > 80){print_debug("No, more than 80 bytes");}
@@ -399,37 +501,83 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
     uint8_t iv[AES_BLOCK_SIZE];
     memcpy(iv, uart_buf, AES_BLOCK_SIZE);
 
-    
+    char output_iv[128];
+    sprintf(output_iv, "%s", iv);
+    output_iv[AES_BLOCK_SIZE] = '\0'; // Null-terminate the string
+    print_debug("UART buffer: ");
+    print_debug(output_iv);
 
+    char output_ms[128];
+    sprintf(output_ms, "%s", uart_buf + AES_BLOCK_SIZE);
+    output_ms[pkt_len- AES_BLOCK_SIZE] = '\0'; // Null-terminate the string
+    print_debug("UART buffer: ");
+    print_debug(output_ms);
+
+    
     // Initialize the AES decryption context with the subscription key
     Aes aes;
     if (wc_AesInit(&aes, NULL, 0) != 0) {
         print_debug("AES initialization failed\n");
         return -1;
     }
-
     /* Set the AES key.
        Note: Our SUBSCRIPTION_KEY is 32 bytes, so we're using AES-256.
        Use WC_AES_DECRYPT as the direction flag.
     */
-    if (wc_AesSetKey(&aes, SUBSCRIPTION_KEY, 32, iv, AES_DECRYPTION) != 0) {//wc_AesSetKey(&aes, key, key_len, iv, AES_DECRYPTION);
+    if (wc_AesSetKey(&aes, SUBSCRIPTION_KEY, sizeof(SUBSCRIPTION_KEY), iv, AES_DECRYPTION) != 0) {//wc_AesSetKey(&aes, key, key_len, iv, AES_DECRYPTION);
         print_debug("Setting AES key failed\n");
         return -1;
     }
 
+    
+
     int encrypted_data_len = (int)pkt_len - AES_BLOCK_SIZE;
     // Decrypt the packet (after the IV, i.e., uart_buf + AES_BLOCK_SIZE)
     uint8_t decrypted_data[encrypted_data_len]; // MAX_SUBSCRIPTION_PACKET_SIZE : 48bytes = 16iv + 32data[24 IQQI + 8padding]
-    int decrypted_len = 0;
+    char char_decrypted_data[encrypted_data_len];
 
     if (wc_AesCbcDecrypt(&aes, decrypted_data, uart_buf + AES_BLOCK_SIZE, encrypted_data_len) != 0) { //WOLFSSL_API int  wc_AesCbcDecrypt(Aes* aes, byte* out , const byte* in, word32 sz);
         print_debug("AES decryption failed\n");
         return -1;
     }  
+    print_debug("Decrypted data last val   : ");
+
+    sprintf(char_decrypted_data, "%s", decrypted_data);
+    print_debug("Decrypted char data: ");
+    print_debug(char_decrypted_data);
+
+    // uint8_t hello_bytes[] = { 0x68, 0x65, 0x6C, 0x6C, 0x6F , 0x00};
+    // char hello_chars[sizeof(hello_bytes)];
+    // print_debug("Hello bytes: ");
+    // sprintf(hello_chars, "%s", hello_bytes);
+    // print_debug(hello_chars);
+
+
+
+    sprintf(char_decrypted_data, "%s", decrypted_data);
+    print_debug("Decrypted char data finallllllll: ");
+    print_debug(char_decrypted_data);
+
+    print_debug("expt");
+
+    int2str((int )decrypted_data[encrypted_data_len - 1]);
+    // print_debug((char )decrypted_data[encrypted_data_len - 1]);
+    // print_debug((char )decrypted_data[encrypted_data_len -1] + 48);
+    if(decrypted_data[encrypted_data_len - 1] == 0x08){print_debug("hurray");}
+
+
+    int decrypted_len = 24 ;// encrypted_data_len - padding_len ideally ;
+    int2str(47);
+    print_debug("Decrypted length: ");
+    int2str(decrypted_len);
+
+    int2str(sizeof(subscription_update_packet_t));
 
     // Remove PKCS7 padding
-    remove_padding(decrypted_data, &decrypted_len);
-
+    // remove_padding(decrypted_data, &decrypted_len);
+    int2str(decrypted_len);
+    print_debug("Decrypted data:\n");
+    // print_debug(decrypted_data);
     // Ensure we have a valid subscription packet
     if (decrypted_len != sizeof(subscription_update_packet_t)) {
         print_error("Invalid decrypted length\n");
@@ -437,18 +585,29 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
         return -1;  // Invalid length after decryption
     }
 
+    // char decrypted_buf[decrypted_len];
+    // memcpy(decrypted_buf, decrypted_data, decrypted_len);
+
     // Parse the decrypted data into the subscription_update_packet_t structure
     subscription_update_packet_t packet;
     memcpy(&packet, decrypted_data, sizeof(subscription_update_packet_t));
 
-    // // Now extract the information from the decrypted frame (assumes struct frame_packet_t exists)
-    subscription_update_packet_t *sub_packet = &packet;
-    channel_id_t channel = sub_packet->channel;
-    timestamp_t start = sub_packet->start_timestamp;
-    timestamp_t end = sub_packet->end_timestamp;
-    decoder_id_t id = sub_packet->decoder_id;
+    int2str(packet.channel);
+    int2str(packet.start_timestamp);
+    int2str(packet.end_timestamp);
+    int2str(packet.decoder_id);
+    
 
-    print_subscription_packet(sub_packet);
+    // // Now extract the information from the decrypted frame (assumes struct frame_packet_t exists)
+    // subscription_update_packet_t *sub_packet = &packet;
+    // channel_id_t channel = sub_packet->channel;
+    // timestamp_t start = sub_packet->start_timestamp;
+    // timestamp_t end = sub_packet->end_timestamp;
+    // decoder_id_t id = sub_packet->decoder_id;
+
+
+
+    // print_subscription_packet(sub_packet);
     // Print the extracted information
     // print_hex_debug(channel, sizeof(channel));
 
@@ -456,7 +615,7 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
 
     // update_subscription(sizeof(subscription_update_packet_t), sub_packet);//to check
     // // If everything is valid, process the decrypted frame
-    // write_packet(SUBSCRIBE_MSG, NULL, 0); // Send an ACK message
+    write_packet(SUBSCRIBE_MSG, NULL, 0); // Send an ACK message
 
     return 0;
 }
