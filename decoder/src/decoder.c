@@ -21,10 +21,11 @@
 #include "mxc_delay.h"
 #include "simple_flash.h"
 #include "host_messaging.h"
-#include "<wolfssl/options.h>"
-#include <wolfssl/ssl.h>
-#include <wolfssl/wolfcrypt/ecdsa.h>
-#include <wolfssl/wolfcrypt/hash.h>
+
+// #include "<wolfssl/options.h>"
+// #include <wolfssl/ssl.h>
+// #include <wolfssl/wolfcrypt/ecdsa.h>
+// #include <wolfssl/wolfcrypt/hash.h>
 
 #include "simple_uart.h"
 
@@ -35,7 +36,13 @@
 // OUR Security realted files using wolfSSL
 // #include "security_utils.h" can do this but printing becomes an issue...so rather inlcude secrets.h here
 #include "secrets.h"
+#include "simple_crypto.h"
 #include "decrypto.h"
+/* The simple crypto example included with the reference design is intended
+ *  to be an example of how you *may* use cryptography in your design. You
+ *  are not limited nor required to use this interface in your design. It is
+ *  recommended for newer teams to start by only using the simple crypto
+ *  library until they have a working design. */
 
 void print_key(const uint8_t *key, size_t length)
 {
@@ -59,7 +66,7 @@ int debug_secrets()
 {
 
     print_debug("$$$$$$$$$$$$$$$$$$$$$$$$ Valid Channels: ");
-    for (int i = 0; i < NUM_CHANNELS; ++i)
+    for (int i = 0; i < (NUM_CHANNELS_EXCEPT_0 + 1); ++i)
     {
         char buf[8];
         snprintf(buf, sizeof(buf), "%d ", VALID_CHANNELS[i]);
@@ -73,8 +80,8 @@ int debug_secrets()
     print_debug("Subscription Key:");
     print_key(SUBSCRIPTION_KEY, 32);
 
-    print_debug("Channel 0 Key:");
-    print_key(CHANNEL_0_KEY, 32);
+    // print_debug("Channel 0 Key:");
+    // print_key(CHANNEL_0_KEY, 32);
 
     print_debug("Channel 1 Key:");
     print_key(CHANNEL_1_KEY, 32);
@@ -97,12 +104,7 @@ int debug_secrets()
     return 0;
 }
 
-/* The simple crypto example included with the reference design is intended
- *  to be an example of how you *may* use cryptography in your design. You
- *  are not limited nor required to use this interface in your design. It is
- *  recommended for newer teams to start by only using the simple crypto
- *  library until they have a working design. */
-#include "simple_crypto.h"
+
 #endif // CRYPTO_EXAMPLE
 
 /******************* PRIMITIVE TYPES **********************/
@@ -154,6 +156,8 @@ typedef struct
     uint32_t n_channels;
     channel_info_t channel_info[MAX_CHANNEL_COUNT];
 } list_response_t;
+
+
 
 #pragma pack(pop) // Tells the compiler to resume padding struct members
 
@@ -253,20 +257,24 @@ int list_channels()
 
 int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
 {
-    //verify the signature of the update packet
-    if (verify_signature(update->data, pkt_len, update->signature, sizeof(update->signature), SIGNATURE_PUBLIC_KEY) != 0)
-    {   
-        STATUS_LED_RED();
-        print_error("Failed to verify signature\n");
-        return -1;
-    }
+    //printfew starting bytes 
+    print_debug("Updating subscription...\n");
+    // print_debug(
     // Check that the packet is the correct size
-    if (pkt_len != sizeof(subscription_update_packet_t))
-    {
-        STATUS_LED_RED();
-        print_error("Invalid packet size\n");
-        return -1;
-    }
+    // if (pkt_len != sizeof(subscription_update_packet_t))
+    // {
+    //     STATUS_LED_RED();
+    //     print_error("Invalid packet size\n"); need to check this
+    //     return -1;
+    // }
+    //verify the signature of the update packet
+    // if (verify_signature(update->data, pkt_len, update->signature, sizeof(update->signature), SIGNATURE_PUBLIC_KEY) != 0)
+    // {   
+    //     STATUS_LED_RED();
+    //     print_error("Failed to verify signature\n");
+    //     return -1;
+    // }
+
 
     // Check that the channel is valid
     if (update->channel > MAX_CHANNEL_COUNT)
@@ -324,57 +332,262 @@ int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
 }
 
 
+/* Helper function to handle PKCS7 padding removal */
+void remove_padding(uint8_t *data, int *len) {
+    int padding_len = data[*len - 1];
+    *len -= padding_len; // Adjust the length
+}
+
+void int2str(int num, char *str) {
+    int i = 0;
+    char pkt_len_buf [64];
+    while (num != 0) {
+        str[i++] = (num % 10) + '0';
+        num /= 10;
+    }
+    str[i] = '\0';
+    // Reverse the string
+    for (int j = 0; j < i / 2; j++) {
+        char temp = str[j];
+        str[j] = str[i - j - 1];
+        str[i - j - 1] = temp;
+    }
+    print_debug(pkt_len_buf);
+}
+
+void print_subscription_packet(const subscription_update_packet_t *packet) {
+    char buf[128];
+    snprintf(buf, sizeof(buf),
+             "Subscription Packet:\n"
+             "  Decoder ID : %u\n"
+             "  Channel    : %u\n"
+             "  Start Time : %llu\n"
+             "  End Time   : %llu\n",
+             packet->decoder_id,
+             packet->channel,
+             (unsigned long long)packet->start_timestamp,
+             (unsigned long long)packet->end_timestamp);
+    print_debug(buf);
+}
+
+int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
+    
+    int2str(pkt_len);
+    // if( pkt_len == 80){print_debug("Yes, 80 bytes");}
+    // else if (pkt_len < 80){print_debug("No, less than 80 bytes");}
+    // else if (pkt_len > 80){print_debug("No, more than 80 bytes");}
+    // else {print_debug("No, invalid length");}
+
+    print_debug("pkt len: - should be 48bytes = 16iv + 32data[24 IQQI + 8padding]");
+    
+    // print_hex_debug(pkt_len_buf, pkt_len);
+    // print_hex_debug(&pkt_len, sizeof(pkt_len));
+
+    // // Extract the signature and the encrypted message
+    // uint8_t *signature = uart_buf;
+    // uint8_t *encrypted_message = uart_buf + SIGNATURE_LENGTH;
+    // size_t encrypted_message_len = pkt_len - SIGNATURE_LENGTH;
+    //signature verification , there is no signature in subscription update packet
+    // int result = verify_signature(encrypted_message, encrypted_message_len, signature, SIGNATURE_LENGTH);
+    // if (result != 0) {
+    //     print_debug("Failed to verify signature\n");
+    //     return -1;
+    // }
+    print_debug("Ufff no subscription Signature verification\n");
+
+    // Extract the IV (first 16 bytes)
+    uint8_t iv[AES_BLOCK_SIZE];
+    memcpy(iv, uart_buf, AES_BLOCK_SIZE);
+
+    
+
+    // Initialize the AES decryption context with the subscription key
+    Aes aes;
+    if (wc_AesInit(&aes, NULL, 0) != 0) {
+        print_debug("AES initialization failed\n");
+        return -1;
+    }
+
+    /* Set the AES key.
+       Note: Our SUBSCRIPTION_KEY is 32 bytes, so we're using AES-256.
+       Use WC_AES_DECRYPT as the direction flag.
+    */
+    if (wc_AesSetKey(&aes, SUBSCRIPTION_KEY, 32, iv, AES_DECRYPTION) != 0) {//wc_AesSetKey(&aes, key, key_len, iv, AES_DECRYPTION);
+        print_debug("Setting AES key failed\n");
+        return -1;
+    }
+
+    int encrypted_data_len = (int)pkt_len - AES_BLOCK_SIZE;
+    // Decrypt the packet (after the IV, i.e., uart_buf + AES_BLOCK_SIZE)
+    uint8_t decrypted_data[encrypted_data_len]; // MAX_SUBSCRIPTION_PACKET_SIZE : 48bytes = 16iv + 32data[24 IQQI + 8padding]
+    int decrypted_len = 0;
+
+    if (wc_AesCbcDecrypt(&aes, decrypted_data, uart_buf + AES_BLOCK_SIZE, encrypted_data_len) != 0) { //WOLFSSL_API int  wc_AesCbcDecrypt(Aes* aes, byte* out , const byte* in, word32 sz);
+        print_debug("AES decryption failed\n");
+        return -1;
+    }  
+
+    // Remove PKCS7 padding
+    remove_padding(decrypted_data, &decrypted_len);
+
+    // Ensure we have a valid subscription packet
+    if (decrypted_len != sizeof(subscription_update_packet_t)) {
+        print_error("Invalid decrypted length\n");
+        
+        return -1;  // Invalid length after decryption
+    }
+
+    // Parse the decrypted data into the subscription_update_packet_t structure
+    subscription_update_packet_t packet;
+    memcpy(&packet, decrypted_data, sizeof(subscription_update_packet_t));
+
+    // // Now extract the information from the decrypted frame (assumes struct frame_packet_t exists)
+    subscription_update_packet_t *sub_packet = &packet;
+    channel_id_t channel = sub_packet->channel;
+    timestamp_t start = sub_packet->start_timestamp;
+    timestamp_t end = sub_packet->end_timestamp;
+    decoder_id_t id = sub_packet->decoder_id;
+
+    print_subscription_packet(sub_packet);
+    // Print the extracted information
+    // print_hex_debug(channel, sizeof(channel));
+
+    // print_debug("Channel: " + str(channel) + "start: " + str(start) + "end: " + str(end) + "DecoderID: " + str(id) + "\n");
+
+    // update_subscription(sizeof(subscription_update_packet_t), sub_packet);//to check
+    // // If everything is valid, process the decrypted frame
+    // write_packet(SUBSCRIBE_MSG, NULL, 0); // Send an ACK message
+
+    return 0;
+}
+
+
+
+int perform_checks(channel_id_t channel, timestamp_t timestamp){
+    // checking all the channel conditions and timestamp conditions before decrypting the frame.
+    if (channel > MAX_CHANNEL_COUNT)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid channel number\n");
+        return -1;
+    }
+    if(is_subscribed(channel) != 1)
+    {
+        STATUS_LED_RED();
+        print_error("Not subscribed to channel\n");
+        return -1;
+    }
+    if (timestamp < decoder_status.subscribed_channels[channel].start_timestamp || timestamp > decoder_status.subscribed_channels[channel].end_timestamp)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid timestamp range\n");
+        return -1;
+    }
+
+    print_debug("Subscription Valid\n");
+    print_debug("Valid timestamp range\n");
+    return 0;
+}
+
+
+
 /** @brief Processes a packet containing frame data.
  *
- *  @param pkt_len A pointer to the incoming packet.
+ *  @param pkt_len  The length of the incoming packet
  *  @param new_frame A pointer to the incoming packet.
  *
  *  @return 0 if successful.  -1 if data is from unsubscribed channel.
  */
+// packet[message[frame,channel,timestamp], signature]
+int decode(pkt_len_t pkt_len, frame_packet_t *new_frame_packet)
+{ return 0;
+//     // Check that the packet is the correct size
+//     // if (pkt_len != (sizeof(frame_packet_t) + SIGNATURE_LENGTH))
+//     // {
+//     //     STATUS_LED_RED();
+//     //     print_error("Invalid packet size\n");
+//     //     return -1;
+//     // }
 
-int decode(pkt_len_t pkt_len, frame_packet_t *new_frame)
-{
+//     // char output_buf[128] = {0}; whyyy
+//     uint16_t frame_size;
+//     channel_id_t channel;
+//     print_debug("Decrypting...\n"); 
+
+//     // Signature and message extraction from new frame
+//     // size_t signature_len = 64; // 64 bytes for ECDSA signature (32 bytes for r and 32 bytes for s)
+//     size_t message_len = pkt_len - SIGNATURE_LENGTH ; //ig not .....sizeof(new_frame) - signature_len;
+//     uint8_t *signature = new_frame_packet;                         // Points to first 64 bytes
+//     //TODO check the ptr arithmetic here
+//     uint8_t *encrypted_message = new_frame_packet + SIGNATURE_LENGTH ; // Points to the encrypted message part
+//     uint8_t frame_size = message_len-(sizeof(new_frame->channel) + sizeof(new_frame->timestamp));
+
+//     int result = verify_signature(encrypted_message, message_len, signature, signature_len, SIGNATURE_PUBLIC_KEY) ;
+//     if (result != 0){
+//         STATUS_LED_RED();
+//         print_error("FAILED to VERIFY SIGNATURE\n");
+//         return -1;
+
+//     }
+    
+//     // Perform ECDH Decryption to obtain the packet, // perform ecdsa decryption using the private key of decoder on the packet
+//     uint8_t received_frame[256];
+//     uint8_t iv_32[32]; //should be 16
+//     frame_packet_t *decrypted_frame[192];
+//     if(ecdh_decrypt(DECODER_PRIVATE_KEY, ENCODER_PUBLIC_KEY, iv_32, received_frame, sizeof(received_frame), decrypted) != 0) //returns non-zero on failure //can be checked if(condition)...but doint explicity != 0 readability
+//     {
+//         STATUS_LED_RED();
+//         print_error("Failed to decrypt frame data\n");
+//         return -1;
+//     }
+
+//     // extract time frame and channel and encrypted frame
+//     channel_id_t channel = decrypted_frame->channel;
+//     timestamp_t timestamp = decrypted_frame->timestamp;
+//     uint8_t frame_data[FRAME_SIZE] = decrypted_frame->frame;
+//     perform_checks(channel, timestamp);
+
+
+//     // Decrypt the frame data using the channel key
+//     // channel_key = channel_keys[channel]; read from header file
+//     // if(decrypt_sym(frame_data, FRAME_SIZE, channel_key, decrypted_frame) != 0)
+//     // frame_packet_t *decrypted_frame = (frame_packet_t *)decrypted_buf;
+//     ////to do this+++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//     // if(decrypt_sym(new_frame_packet->data, 
+//     //                pkt_len - (sizeof(new_frame_packet->channel) + sizeof(new_frame_packet->timestamp)), 
+//     //                (uint8_t *)decrypted_frame, 
+//     //                (uint8_t *)DECODER_PRIVATE_KEY) != 0)
+//     // {
+//     //     STATUS_LED_RED();
+//     //     print_error("Failed to decrypt frame data\n");
+//     //     return -1;
+//     // }
+//     //+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+//     //check decrypted frame
+//     if(decrypted_frame->channel != channel)
+//     {
+//         STATUS_LED_RED();
+//         print_error("Decrypted frame channel does not match\n");
+//         return -1;
+//     }
+//     if(decrypted_frame->timestamp != timestamp)
+//     {
+//         STATUS_LED_RED();
+//         print_error("Decrypted frame timestamp does not match\n");
+//         return -1;
+//     }
+
+//     // Frame size is the size of the packet minus the size of non-frame elements
+//     write_packet(DECODE_MSG, decrypted_frame->frame, frame_size);
+//     return 0;
+
+}
+
+int old_decode(pkt_len_t pkt_len, frame_packet_t *new_frame) {
     char output_buf[128] = {0};
     uint16_t frame_size;
     channel_id_t channel;
-
-    // perform ecdsa decryption using the private key of decoder on the packet
-    print_debug("Decrypting...\n");
-
-    // Signature and message extraction from new frame
-    size_t signature_len = 64;
-    size_t message_len = sizeof(new_frame) - signature_len;
-    uint8_t *signature = new_frame;                         // Points to first 64 bytes
-    uint8_t *encrypted_message = new_frame + signature_len; // Points to the rest
-
-    int result = verify_signature(encrypted_message, message_len, signature, signature_len, SIGNATURE_PUBLIC_KEY) ;
-    if (result)
-    {
-        // Perform ECDH Decryption to obtain the packet
-        uint8_t received_frame[256];
-        uint8_t iv_32[32];
-        frame_packet_t *decrypted_frame[192];
-        ecdh_decrypt(DECODER_PRIVATE_KEY, ENCODER_PUBLIC_KEY, iv_32, received_frame, sizeof(received_frame), decrypted);
-
-        // extract time frame and channel and encrypted frame
-        channel_id_t channel = decrypted_frame->channel;
-        timestamp_t timestamp = decrypted_frame->timestamp;
-        uint8_t data[FRAME_SIZE] = decrypted_frame->frame;
-
-        // checking all the channel conditions and timestamp conditions before decrypting the frame.
-        // define channel_keys = {}
-        channel_key = channel_keys[channel];
-    }
-
-    // frame_packet_t *decrypted_frame = (frame_packet_t *)decrypted_buf;
-    int ret = decrypt_sym(new_frame->data, pkt_len - (sizeof(new_frame->channel) + sizeof(new_frame->timestamp)), (uint8_t *)decrypted_frame, (uint8_t *)DECODER_PRIVATE_KEY);
-    if (ret < 0)
-    {
-        STATUS_LED_RED();
-        print_error("Failed to decrypt frame data\n");
-        return -1;
-    }
-    // Check that the decrypted frame is valid
 
     // Frame size is the size of the packet minus the size of non-frame elements
     frame_size = pkt_len - (sizeof(new_frame->channel) + sizeof(new_frame->timestamp));
@@ -385,16 +598,13 @@ int decode(pkt_len_t pkt_len, frame_packet_t *new_frame)
 
     // Check that we are subscribed to the channel...
     print_debug("Checking subscription\n");
-    if (is_subscribed(channel))
-    {
+    if (is_subscribed(channel)) {
         print_debug("Subscription Valid\n");
         /* The reference design doesn't need any extra work to decode, but your design likely will.
-         *  Do any extra decoding here before returning the result to the host. */
+        *  Do any extra decoding here before returning the result to the host. */
         write_packet(DECODE_MSG, new_frame->data, frame_size);
         return 0;
-    }
-    else
-    {
+    } else {
         STATUS_LED_RED();
         sprintf(
             output_buf,
@@ -403,8 +613,6 @@ int decode(pkt_len_t pkt_len, frame_packet_t *new_frame)
         return -1;
     }
 }
-
-
 
 
 /** @brief Initializes peripherals for system boot.
@@ -497,6 +705,17 @@ void crypto_example(void)
 
 
 
+
+// void debug_uart(uint16_t pkt_len, const uint8_t *uart_buf, char *ascii_output, size_t ascii_len) {
+//     for (int i = 0; i < ascii_len-1 && i < pkt_len; ++i) {
+//         ascii_output[i] = (uart_buf[i] >= 32 && uart_buf[i] <= 126) ? uart_buf[i] : '.'; // Printable ASCII or '.'
+//     }
+//     ascii_output[ascii_len-1] = '\0'; // Null-terminate the string
+//     print_hex_debug(ascii_output, ascii_len); // Print the ASCII representation
+    // ufff
+// }
+// #define UART_DEBUG_LEN 10
+
 /*********************** MAIN LOOP ************************/
 int main(void)
 {
@@ -517,6 +736,13 @@ int main(void)
         STATUS_LED_GREEN();
 
         result = read_packet(&cmd, uart_buf, &pkt_len);
+        // debug_uart(pkt_len, uart_buf, ascii_output, UART_DEBUG_LEN);
+        print_hex_debug(uart_buf, pkt_len); // Print the hex representation
+        
+        // read few bytes from the buffer and convert to ascii before sending to debug
+        print_debug("||||||||||||||  Received UART buffer |||||||||");
+
+
         if (result < 0)
         {
             STATUS_LED_ERROR();
@@ -534,6 +760,7 @@ int main(void)
 
             #ifdef CRYPTO_EXAMPLE
             // Run the crypto example
+            crypto_example();
             // TODO: Remove this from your design
             debug_secrets();
             #endif // CRYPTO_EXAMPLE
@@ -544,13 +771,13 @@ int main(void)
         // Handle decode command
         case DECODE_MSG:
             STATUS_LED_PURPLE();
-            decode(pkt_len, (frame_packet_t *)uart_buf);
+            old_decode(pkt_len, (frame_packet_t *)uart_buf);
             break;
 
         // Handle subscribe command
         case SUBSCRIBE_MSG:
             STATUS_LED_YELLOW();
-            update_subscription(pkt_len, (subscription_update_packet_t *)uart_buf);
+            handle_update_subscription(pkt_len, uart_buf);
             break;
 
         // Handle bad command

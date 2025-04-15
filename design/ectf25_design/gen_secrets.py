@@ -148,6 +148,7 @@ def main():
 
     secrets = gen_secrets(args.channels)
     secrets_header_output_path = str(args.secrets_file).split(".")[0] + ".h" #assuming .json file (not global.secrets)
+    secrets_header_output_path = Path("decoder/inc/secrets.h") # + secrets_header_output_path.split("/")[1]) when gensecrets run inside ectf-folder
     print(f"secrets_header_output_path: {secrets_header_output_path}")
 
     # Check if the file already exists

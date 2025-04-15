@@ -12,7 +12,6 @@
  */
 
 #include <stdio.h>
-
 #include "host_messaging.h"
 
 

@@ -42,14 +42,15 @@ def gen_subscription(
     
     # Get the subscription key from secrets
     subscription_key = base64.b64decode(secrets_data["subscription_key"])
+    
     # Get the channel key for the requested channel
     channel_key = base64.b64decode(secrets_data["channel_keys"][str(channel)])
     
     # Create the subscription update packet
     subscription_data = struct.pack("<IQQI", device_id, start, end, channel)
     
-    # Add the channel key to the subscription data..why 
-    # subscription_data += channel_key , ik its a good idea to send key during subscription only...but trying to avoid playing with keys outside build time
+    # Add the channel key to the subscription data
+    subscription_data += channel_key
     
     # Pad the data to match the block size of AES
     padder = padding.PKCS7(128).padder()

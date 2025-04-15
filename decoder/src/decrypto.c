@@ -1,18 +1,148 @@
 
-#include <stdio.h>
-#include <stdint.h>
-// #include <string.h>
+// #ifdef CRYPTO_EXAMPLE
+#include "decrypto.h"
 
-#include "<wolfssl/options.h>"
-#include <wolfssl/ssl.h>
-#include <wolfssl/wolfcrypt/ecdsa.h>
-#include <wolfssl/wolfcrypt/hash.h>
-#include <wolfssl/wolfcrypt/aes.h>
+int aes_decrypt_cbc(const uint8_t *encrypted_data, size_t encrypted_data_len,
+                    const uint8_t *key, const uint8_t *iv, uint8_t *decrypted_data) {
+    Aes aes;
+    int result;
+
+    // Initialize AES context
+    if (wc_AesInit(&aes, NULL, INVALID_DEVID) != 0) {
+        return -1;
+    }
+
+    // Set the 256-bit AES decryption key
+    result = wc_AesSetKey(&aes, key, 32, iv, AES_DECRYPTION);
+    if (result != 0) {
+        wc_AesFree(&aes);
+        return -1;
+    }
+
+    // Perform decryption
+    result = wc_AesCbcDecrypt(&aes, decrypted_data, encrypted_data, encrypted_data_len);
+    if (result != 0) {
+        wc_AesFree(&aes);
+        return -1;
+    }
+
+    wc_AesFree(&aes);
+    return (int)encrypted_data_len;
+}
 
 
-#define AES_KEY_SIZE 32
-#define AES_IV_SIZE 16
-#define AES_BLOCK_SIZE 16
+
+
+
+/** brief Verify the signature of the message using the public key.
+ * 
+ * @param message The message to verify.
+ * @param message_len The length of the message.
+ * @param signature The signature to verify.
+ * @param signature_len The length of the signature.
+ * @param public_key The public key in PEM format.
+ * 
+ * @return 0 if the signature is valid, non-zero if invalid.
+ * 
+ */
+int verify_signature(
+    unsigned char *message, 
+    size_t message_len, 
+    unsigned char *signature, 
+    size_t signature_len, 
+    const char *public_key)
+{
+    byte der[512];
+    word32 derSize = sizeof(der);
+
+    int ret = wc_KeyPemToDer((const byte *)public_key, (word32)strlen(public_key), der, derSize, NULL);
+    if (ret < 0)
+    {
+        printf("PEM to DER failed: %d\n", ret);
+        return -1;
+    }
+    derSize = ret;
+
+    ecc_key pubKey;
+    wc_ecc_init(&pubKey);
+
+    ret = wc_EccPublicKeyDecode(der, NULL, &pubKey, derSize);
+    if (ret < 0)
+    {
+        printf("Public key decode failed: %d\n", ret);
+        wc_ecc_free(&pubKey);
+        return -1;
+    }
+
+    // Compute hash of the message (ECDSA signs/verifies the hash)
+    byte hash[SHA256_DIGEST_SIZE];
+    ret = wc_Sha256Hash(message, message_len, hash);
+    if (ret != 0)
+    {
+        printf("SHA-256 hash failed: %d\n", ret);
+        wc_ecc_free(&pubKey);
+        return -1;
+    }
+
+    // Verify the signature
+    int verify_result;
+    ret = wc_ecc_verify_hash(signature, (word32)signature_len,
+                             hash, SHA256_DIGEST_SIZE,
+                             &verify_result, &pubKey);
+
+    wc_ecc_free(&pubKey);
+
+    if (ret < 0)
+    {
+        printf("Signature verification failed: %d\n", ret);
+        return -1;
+    }
+
+    return !verify_result;  // 0 = valid,  non-zero(1) = invalid
+}
+
+
+// int verify_signature(
+//     unsigned char *message, 
+//     size_t message_len, 
+//     unsigned char *signature, 
+//     size_t signature_len, 
+//     char *public_key)
+// {
+
+//     byte der[256];
+//     word32 derSize = sizeof(der);
+
+//     int ret = wc_KeyPemToDer((const byte *)public_key, strlen(public_key), der, derSize, NULL);
+//     if (ret < 0)
+//     {
+//         printf("PEM to DER failed: %d\n", ret);
+//         return -1;
+//     }
+//     derSize = ret; //bytes converted to der
+
+//     wc_ecc_key pubKey;
+//     wc_ecc_init(&pubKey);
+//     ret = wc_EccPublicKeyDecode(der, NULL, &pubKey, derSize);
+//     if (ret < 0)
+//     {
+//         printf("Key decode failed: %d\n", ret);
+//         return -1;
+//     }
+
+//     // Verify the signature
+//     int result;
+//     ret = wc_ecc_verify(signature, signature_len, message, message_len, &result, &pubKey);
+
+//     if (ret < 0)
+//     {
+//         printf("Signature verify error: %d\n", ret);
+//         return -1;
+//     }
+
+
+//     return result;
+// }
 
 
 int ecdh_decrypt(
@@ -25,7 +155,7 @@ int ecdh_decrypt(
 )
 {
     int ret;
-    wc_ecc_key myKey, peerKey;
+    ecc_key myKey, peerKey; //ignore the squiggly errors    
     byte derPriv[1024], derPub[1024];
     word32 derPrivSz, derPubSz;
 
@@ -106,47 +236,7 @@ int ecdh_decrypt(
     return 0;
 }
 
-int verify_signature(
-    unsigned char *message, 
-    size_t message_len, 
-    unsigned char *signature, 
-    size_t signature_len, 
-    char *public_key)
-{
-    int ret;
-    byte der[256];
 
-    byte der[256];
-    word32 derSize = sizeof(der);
-    int ret = wc_KeyPemToDer((const byte *)public_key, strlen(public_key), der, derSize, NULL);
-    if (ret < 0)
-    {
-        printf("PEM to DER failed: %d\n", ret);
-        return -1;
-    }
-    derSize = ret;
-
-    wc_ecc_key pubKey;
-    wc_ecc_init(&pubKey);
-    ret = wc_EccPublicKeyDecode(der, NULL, &pubKey, derSz);
-    if (ret < 0)
-    {
-        printf("Key decode failed: %d\n", ret);
-        return -1;
-    }
-
-    // Verify the signature
-    int result;
-    ret = wc_ecc_verify(signature, signature_len, message, message_len, &result, &ecc_key);
-
-    if (ret < 0)
-    {
-        printf("Signature verify error: %d\n", ret);
-        return -1;
-    }
-
-    return result;
-}
 
 int aes_decrypt(
     const uint8_t *aes_key, 
@@ -189,3 +279,5 @@ int aes_decrypt(
 
     return 0; // Decryption successful
 }
+
+// #endif // CRYPTO_EXAMPLE

@@ -78,6 +78,7 @@ int read_packet(msg_type_t* cmd, void *buf, uint16_t *len);
 
 // Macro definitions to print the specified format for debug messages
 #define print_debug(msg) write_packet(DEBUG_MSG, msg, strlen(msg))
+// #define print_debug_buffer(msg,) write_packet(DEBUG_MSG, msg, strlen(msg))
 #define print_hex_debug(msg, len) write_hex(DEBUG_MSG, msg, len)
 
 // Macro definitions to write ack message

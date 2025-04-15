@@ -39,7 +39,7 @@ ENTRY=firmware_startup
 
 # Enable Crypto Example
 CRYPTO_EXAMPLE=1
-IPATH += /secrets/ #for the secrets.h file
+# IPATH += /secrets #for the secrets.h file
 
 #other libs that we may require
 # json-c--------------------------------
@@ -50,7 +50,9 @@ IPATH += /secrets/ #for the secrets.h file
 # PROJ_LDFLAGS += /usr/lib/x86_64-linux-gnu/libjson-c.so
 
 
-
+PROJ_CFLAGS += -DHAVE_ECC -DWOLFSSL_AES -DWOLFSSL_SHA256  #REQUIRED 
+# PROJ_CFLAGS += -DHAVE_AESGCM
+# PROJ_CFLAGS += -DHAVE_PK_CALLBACKS -DWOLFSSL_USER_IO -DNO_WRITEV -DTIME_T_NOT_64BIT
 #-----------------------------------------
 # PROJ_CFLAGS += -ljson-c
 # LIBS += -ljson-c 

@@ -5,3 +5,11 @@
 
 
 //keys are always there...but decrypted only if this is true and timestamps are in valid range 
+
+ IPATH += /secrets was throwing error with including wolfssl
+
+ //NOTE
+ in case of subscription update
+ An attacker could tamper with the ciphertext (like flipping bits), and the decryption could still proceed without errors — but produce garbage data.
+ padding oracle or bit-flipping attacks.
+ //but i am assuing this scenario wont occur

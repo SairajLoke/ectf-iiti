@@ -100,15 +100,18 @@ class Encoder:
         packet_data = {
             "channel": channel,
             "timestamp": timestamp,
-            "frame": encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
+            "frame": base64.b64encode(encrypted_frame).decode("utf-8") #encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
         }
+        
         packet_cft_bytes = json.dumps(packet_data).encode("utf-8")
         encrypted_packet = self.ecdh(packet_cft_bytes)
         
         #signin the encrypted pkt
-        signed_packet = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
+        signed_certificate = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
+        # check len opf signed certificate
         
-        return signed_packet + encrypted_frame
+        
+        return signed_certificate + encrypted_packet
 
 
 def main():
