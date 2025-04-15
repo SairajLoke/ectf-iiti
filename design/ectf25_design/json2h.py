@@ -4,12 +4,15 @@ import sys
 import os
 from pathlib import Path
 
-def json_to_c_header(json_file, header_file):
+
+ALL_CHANNELS_EXCEPT_0 = [ 1, 2, 3, 4, 5, 6, 7, 8]
+
+def json_to_c_header(secrets, header_file):
     """Convert a JSON secrets file to a C header file"""
     
     # Read the JSON file
-    with open(json_file, 'r') as f:
-        secrets = json.load(f)
+    # with open(json_file, 'r') as f:
+    #     secrets = json.load(f)
     
     # Start building the header content
     header = """
@@ -27,9 +30,10 @@ def json_to_c_header(json_file, header_file):
 """
     
     # Add channels
-    channels = secrets.get("channels", [])
-    header += f"#define NUM_CHANNELS {len(channels) + 1}\n"  # +1 for channel 0
-    header += f"static const uint8_t VALID_CHANNELS[] = {{0, {', '.join(str(c) for c in channels)}}};\n\n"
+    # channels = secrets.get("channels", []) 
+    
+    header += f"#define NUM_CHANNELS_EXCEPT_0 {len(ALL_CHANNELS_EXCEPT_0)}\n"  # including channel 0
+    header += f"static const uint8_t VALID_CHANNELS[] = {{0, {', '.join(str(c) for c in ALL_CHANNELS_EXCEPT_0)}}};\n\n"
     
     # Add root key
     root_key_b64 = secrets.get("root_key", "")
@@ -90,7 +94,8 @@ def json_to_c_header(json_file, header_file):
     with open(header_file, 'w') as f:
         f.write(header)
     
-    print(f"Converted {json_file} to C header file {header_file}")
+    print(f"Converted to C header file {header_file}")
+
 
 def main():
     # if len(sys.argv) < 3:
@@ -100,7 +105,10 @@ def main():
     json_file = "secrets/secrets.json"
     header_file = "decoder/inc/secrets.h"
     
-    json_to_c_header(json_file, header_file)
+    # Read the JSON file
+    # with open(json_file, 'r') as f:
+    #     secrets = json.load(f)
+    # json_to_c_header(secrets=secrets, header_file=header_file)
 
 if __name__ == "__main__":
     main()

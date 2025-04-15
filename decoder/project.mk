@@ -39,10 +39,11 @@ ENTRY=firmware_startup
 
 # Enable Crypto Example
 CRYPTO_EXAMPLE=1
+IPATH += /secrets/ #for the secrets.h file
 
 #other libs that we may require
 # json-c--------------------------------
-IPATH += /usr/include/json-c
+# IPATH += /usr/include/json-c worked
 # PROJ_LDFLAGS += -ljson-c #nope
 
 # LINKERFILE += /usr/lib/x86_64-linux-gnu/libjson-c.so

@@ -32,10 +32,10 @@
  *  be ignored by the compiler if CRYPTO_EXAMPLE is not set in
  *  the projectk.mk file. */
 #ifdef CRYPTO_EXAMPLE
-
 // OUR Security realted files using wolfSSL
 // #include "security_utils.h" can do this but printing becomes an issue...so rather inlcude secrets.h here
 #include "secrets.h"
+#include "decrypto.h"
 
 void print_key(const uint8_t *key, size_t length)
 {
@@ -105,19 +105,13 @@ int debug_secrets()
 #include "simple_crypto.h"
 #endif // CRYPTO_EXAMPLE
 
-/**********************************************************
- ******************* PRIMITIVE TYPES **********************
- **********************************************************/
-
+/******************* PRIMITIVE TYPES **********************/
 #define timestamp_t uint64_t
 #define channel_id_t uint32_t
 #define decoder_id_t uint32_t
 #define pkt_len_t uint16_t
 
-/**********************************************************
- *********************** CONSTANTS ************************
- **********************************************************/
-
+/*********************** CONSTANTS ************************/
 #define MAX_CHANNEL_COUNT 8
 #define EMERGENCY_CHANNEL 0
 #define FRAME_SIZE 64
@@ -125,17 +119,11 @@ int debug_secrets()
 // This is a canary value so we can confirm whether this decoder has booted before
 #define FLASH_FIRST_BOOT 0xDEADBEEF
 
-/**********************************************************
- ********************* STATE MACROS ***********************
- **********************************************************/
-
+/********************* STATE MACROS ***********************/
 // Calculate the flash address where we will store channel info as the 2nd to last page available
 #define FLASH_STATUS_ADDR ((MXC_FLASH_MEM_BASE + MXC_FLASH_MEM_SIZE) - (2 * MXC_FLASH_PAGE_SIZE))
 
-/**********************************************************
- *********** COMMUNICATION PACKET DEFINITIONS *************
- **********************************************************/
-
+/*********** COMMUNICATION PACKET DEFINITIONS *************/
 #pragma pack(push, 1) // Tells the compiler not to pad the struct members
 // for more information on what struct padding does, see:
 // https://www.gnu.org/software/c-intro-and-ref/manual/html_node/Structure-Layout.html
@@ -169,10 +157,7 @@ typedef struct
 
 #pragma pack(pop) // Tells the compiler to resume padding struct members
 
-/**********************************************************
- ******************** TYPE DEFINITIONS ********************
- **********************************************************/
-
+/******************** TYPE DEFINITIONS ********************/
 typedef struct
 {
     bool active;
@@ -187,61 +172,18 @@ typedef struct
     channel_status_t subscribed_channels[MAX_CHANNEL_COUNT];
 } flash_entry_t;
 
-/**********************************************************
- ************************ GLOBALS *************************
- **********************************************************/
-
+/************************ GLOBALS *************************/
 // This is used to track decoder subscriptions
 flash_entry_t decoder_status;
 uint8_t encrypted_buf[256]; // Adjust size as needed
 uint8_t decrypted_buf[256];
 pkt_len_t pkt_len;
 
-/**********************************************************
- ******************** REFERENCE FLAG **********************
- **********************************************************/
 
-// trust me, it's easier to get the boot reference flag by
-// getting this running than to try to untangle this
-// TODO: remove this from your final design
-// NOTE: you're not allowed to do this in your code
-typedef uint32_t aErjfkdfru;
-const aErjfkdfru aseiFuengleR[] = {0x1ffe4b6, 0x3098ac, 0x2f56101, 0x11a38bb, 0x485124, 0x11644a7, 0x3c74e8, 0x3c74e8, 0x2f56101, 0x2ca498, 0x127bc, 0x2e590b1, 0x1d467da, 0x1fbf0a2, 0x11a38bb, 0x2b22bad, 0x2e590b1, 0x1ffe4b6, 0x2b61fc1, 0x1fbf0a2, 0x1fbf0a2, 0x2e590b1, 0x11644a7, 0x2e590b1, 0x1cc7fb2, 0x1d073c6, 0x2179d2e, 0};
-const aErjfkdfru djFIehjkklIH[] = {0x138e798, 0x2cdbb14, 0x1f9f376, 0x23bcfda, 0x1d90544, 0x1cad2d2, 0x860e2c, 0x860e2c, 0x1f9f376, 0x25cbe0c, 0x11c82b4, 0x35ff56, 0x3935040, 0xc7ea90, 0x23bcfda, 0x1ae6dee, 0x35ff56, 0x138e798, 0x21f6af6, 0xc7ea90, 0xc7ea90, 0x35ff56, 0x1cad2d2, 0x35ff56, 0x2b15630, 0x3225338, 0x4431c8, 0};
-typedef int skerufjp;
-skerufjp siNfidpL(skerufjp verLKUDSfj)
-{
-    aErjfkdfru ubkerpYBd = 12 + 1;
-    skerufjp xUrenrkldxpxx = 2253667944 % 0x432a1f32;
-    aErjfkdfru UfejrlcpD = 1361423303;
-    verLKUDSfj = (verLKUDSfj + 0x12345678) % 60466176;
-    while (xUrenrkldxpxx-- != 0)
-    {
-        verLKUDSfj = (ubkerpYBd * verLKUDSfj + UfejrlcpD) % 0x39aa400;
-    }
-    return verLKUDSfj;
-}
-typedef uint8_t kkjerfI;
-kkjerfI deobfuscate(aErjfkdfru veruioPjfke, aErjfkdfru veruioPjfwe)
-{
-    skerufjp fjekovERf = 2253667944 % 0x432a1f32;
-    aErjfkdfru veruicPjfwe, verulcPjfwe;
-    while (fjekovERf-- != 0)
-    {
-        veruioPjfwe = (veruioPjfwe - siNfidpL(veruioPjfke)) % 0x39aa400;
-        veruioPjfke = (veruioPjfke - siNfidpL(veruioPjfwe)) % 60466176;
-    }
-    veruicPjfwe = (veruioPjfke + 0x39aa400) % 60466176;
-    verulcPjfwe = (veruioPjfwe + 60466176) % 0x39aa400;
-    return veruicPjfwe * 60466176 + verulcPjfwe - 89;
-}
 
-/**********************************************************
- ******************* UTILITY FUNCTIONS ********************
- **********************************************************/
-
+/******************* UTILITY FUNCTIONS ********************/
 /** @brief Checks whether the decoder is subscribed to a given channel
- *
+ * 
  *  @param channel The channel number to be checked.
  *  @return 1 if the the decoder is subscribed to the channel.  0 if not.
  */
@@ -263,30 +205,10 @@ int is_subscribed(channel_id_t channel)
     return 0;
 }
 
-/** @brief Prints the boot reference design flag
- *
- *  TODO: Remove this in your final design
- */
-void boot_flag(void)
-{
-    char flag[28];
-    char output_buf[128] = {0};
 
-    for (int i = 0; aseiFuengleR[i]; i++)
-    {
-        flag[i] = deobfuscate(aseiFuengleR[i], djFIehjkklIH[i]);
-        flag[i + 1] = 0;
-    }
-    sprintf(output_buf, "Boot Reference Flag: %s\n", flag);
-    print_debug(output_buf);
-}
-
-/**********************************************************
- ********************* CORE FUNCTIONS *********************
- **********************************************************/
-
+/********************* CORE FUNCTIONS *********************/
 /** @brief Lists out the actively subscribed channels over UART.
- *
+ * 
  *  @return 0 if successful.
  */
 int list_channels()
@@ -314,6 +236,9 @@ int list_channels()
     return 0;
 }
 
+
+
+/************************** SUBSCRIPTION FUNCTION *****************/
 /** @brief Updates the channel subscription for a subset of channels.
  *
  *  @param pkt_len The length of the incoming packet
@@ -328,8 +253,39 @@ int list_channels()
 
 int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
 {
-    int i;
+    //verify the signature of the update packet
+    if (verify_signature(update->data, pkt_len, update->signature, sizeof(update->signature), SIGNATURE_PUBLIC_KEY) != 0)
+    {   
+        STATUS_LED_RED();
+        print_error("Failed to verify signature\n");
+        return -1;
+    }
+    // Check that the packet is the correct size
+    if (pkt_len != sizeof(subscription_update_packet_t))
+    {
+        STATUS_LED_RED();
+        print_error("Invalid packet size\n");
+        return -1;
+    }
 
+    // Check that the channel is valid
+    if (update->channel > MAX_CHANNEL_COUNT)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid channel number\n");
+        return -1;
+    }
+
+    // Check that the start and end timestamps are valid
+    if (update->start_timestamp > update->end_timestamp)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid timestamp range\n");
+        return -1;
+    }
+
+
+    int i;
     if (update->channel == EMERGENCY_CHANNEL)
     {
         STATUS_LED_RED();
@@ -337,12 +293,14 @@ int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
         return -1;
     }
 
+
     // Find the first empty slot in the subscription array
     for (i = 0; i < MAX_CHANNEL_COUNT; i++)
     {
-        if (decoder_status.subscribed_channels[i].id == update->channel || !decoder_status.subscribed_channels[i].active)
+        if (decoder_status.subscribed_channels[i].id == update->channel || 
+            !decoder_status.subscribed_channels[i].active)
         {
-            decoder_status.subscribed_channels[i].active = true;
+            decoder_status.subscribed_channels[i].active = true; //keys are always there...but decrypted only if this is true and timestamps are in valid range 
             decoder_status.subscribed_channels[i].id = update->channel;
             decoder_status.subscribed_channels[i].start_timestamp = update->start_timestamp;
             decoder_status.subscribed_channels[i].end_timestamp = update->end_timestamp;
@@ -365,177 +323,6 @@ int update_subscription(pkt_len_t pkt_len, subscription_update_packet_t *update)
     return 0;
 }
 
-#define AES_KEY_SIZE 32
-#define AES_IV_SIZE 16
-
-int ecdh_decrypt(
-    const char *private_key_pem,   // The private key in PEM format
-    const char *public_key_pem,    // The peer's public key in PEM format
-    const uint8_t *iv_32,          // 32-byte IV used in AES encryption
-    const uint8_t *received_frame, // The encrypted message (without signature)
-    size_t frame_len,              // Length of the encrypted message
-    uint8_t *decrypted_output      // Buffer for decrypted output
-)
-{
-    int ret;
-    wc_ecc_key myKey, peerKey;
-    byte derPriv[1024], derPub[1024];
-    word32 derPrivSz, derPubSz;
-
-    uint8_t shared_secret[32];
-    word32 shared_len = sizeof(shared_secret);
-
-    Aes aes;
-
-    // Initialize ECC keys
-    wc_ecc_init(&myKey);
-    wc_ecc_init(&peerKey);
-
-    // Convert private key PEM to DER format
-    derPrivSz = wc_KeyPemToDer((const byte *)private_key_pem, (word32)strlen(private_key_pem),
-                               derPriv, sizeof(derPriv), NULL);
-    if (derPrivSz <= 0)
-    {
-        printf("Private key PEM to DER failed: %d\n", derPrivSz);
-        return derPrivSz;
-    }
-
-    // Decode the private key from DER format
-    ret = wc_EccPrivateKeyDecode(derPriv, NULL, &myKey, derPrivSz);
-    if (ret != 0)
-    {
-        printf("Private key decode failed: %d\n", ret);
-        return ret;
-    }
-
-    // Convert public key PEM to DER format
-    derPubSz = wc_KeyPemToDer((const byte *)public_key_pem, (word32)strlen(public_key_pem),
-                              derPub, sizeof(derPub), NULL);
-    if (derPubSz <= 0)
-    {
-        printf("Public key PEM to DER failed: %d\n", derPubSz);
-        return derPubSz;
-    }
-
-    // Decode the public key from DER format
-    ret = wc_EccPublicKeyDecode(derPub, NULL, &peerKey, derPubSz);
-    if (ret != 0)
-    {
-        printf("Public key decode failed: %d\n", ret);
-        return ret;
-    }
-
-    // ECDH: Derive shared secret
-    ret = wc_ecc_shared_secret(&myKey, &peerKey, shared_secret, &shared_len);
-    if (ret != 0)
-    {
-        printf("ECDH shared secret failed: %d\n", ret);
-        return ret;
-    }
-
-    // Setup AES using the shared secret and first 16 bytes of the IV
-    uint8_t aes_iv[16];
-    memcpy(aes_iv, iv_32, 16); // Use first 16 bytes of the 32-byte IV
-
-    ret = wc_AesSetKey(&aes, shared_secret, AES_KEY_SIZE, aes_iv, AES_DECRYPTION);
-    if (ret != 0)
-    {
-        printf("AES set key failed: %d\n", ret);
-        return ret;
-    }
-
-    // Decrypt the encrypted message (without signature)
-    ret = wc_AesCbcDecrypt(&aes, decrypted_output, received_frame, frame_len);
-    if (ret != 0)
-    {
-        printf("AES decryption failed: %d\n", ret);
-        return ret;
-    }
-
-    // Free ECC keys after use
-    wc_ecc_free(&myKey);
-    wc_ecc_free(&peerKey);
-
-    return 0;
-}
-
-int verify_signature(unsigned char *message, size_t message_len, unsigned char *signature, size_t signature_len, char *public_key)
-{
-    int ret;
-    byte der[256];
-
-    byte der[256];
-    word32 derSize = sizeof(der);
-    int ret = wc_KeyPemToDer((const byte *)public_key, strlen(public_key), der, derSize, NULL);
-    if (ret < 0)
-    {
-        printf("PEM to DER failed: %d\n", ret);
-        return -1;
-    }
-    derSize = ret;
-
-    wc_ecc_key pubKey;
-    wc_ecc_init(&pubKey);
-    ret = wc_EccPublicKeyDecode(der, NULL, &pubKey, derSz);
-    if (ret < 0)
-    {
-        printf("Key decode failed: %d\n", ret);
-        return -1;
-    }
-
-    // Verify the signature
-    int result;
-    ret = wc_ecc_verify(signature, signature_len, message, message_len, &result, &ecc_key);
-
-    if (ret < 0)
-    {
-        printf("Signature verify error: %d\n", ret);
-        return -1;
-    }
-
-    return result;
-}
-
-#define AES_KEY_SIZE 32
-#define AES_BLOCK_SIZE 16
-#define AES_IV_SIZE 16
-
-int aes_decrypt(const uint8_t *aes_key, const uint8_t *iv_16, const uint8_t *encrypted_data, size_t encrypted_len, uint8_t *decrypted_output)
-{
-    int ret;
-    Aes aes; // AES context
-
-    // Initialize AES context
-    ret = wc_AesInit(&aes, NULL, NULL);
-    if (ret != 0)
-    {
-        printf("AES initialization failed: %d\n", ret);
-        return ret;
-    }
-
-    // Set the AES decryption key using the provided AES key
-    ret = wc_AesSetKey(&aes, aes_key, AES_KEY_SIZE, iv_16, AES_DECRYPTION);
-    if (ret != 0)
-    {
-        printf("AES key setup failed: %d\n", ret);
-        wc_AesFree(&aes);
-        return ret;
-    }
-
-    // Decrypt the data using AES in CBC mode
-    ret = wc_AesCbcDecrypt(&aes, decrypted_output, encrypted_data, encrypted_len);
-    if (ret != 0)
-    {
-        printf("AES decryption failed: %d\n", ret);
-        wc_AesFree(&aes);
-        return ret;
-    }
-
-    // Clean up AES context
-    wc_AesFree(&aes);
-
-    return 0; // Decryption successful
-}
 
 /** @brief Processes a packet containing frame data.
  *
@@ -560,7 +347,8 @@ int decode(pkt_len_t pkt_len, frame_packet_t *new_frame)
     uint8_t *signature = new_frame;                         // Points to first 64 bytes
     uint8_t *encrypted_message = new_frame + signature_len; // Points to the rest
 
-    int result = verify_signature(encrypted_message, message_len, signature, signature_len, SIGNATURE_PUBLIC_KEY) if (result)
+    int result = verify_signature(encrypted_message, message_len, signature, signature_len, SIGNATURE_PUBLIC_KEY) ;
+    if (result)
     {
         // Perform ECDH Decryption to obtain the packet
         uint8_t received_frame[256];
@@ -615,6 +403,9 @@ int decode(pkt_len_t pkt_len, frame_packet_t *new_frame)
         return -1;
     }
 }
+
+
+
 
 /** @brief Initializes peripherals for system boot.
  */
@@ -704,10 +495,9 @@ void crypto_example(void)
 }
 #endif // CRYPTO_EXAMPLE
 
-/**********************************************************
- *********************** MAIN LOOP ************************
- **********************************************************/
 
+
+/*********************** MAIN LOOP ************************/
 int main(void)
 {
     char output_buf[128] = {0};
@@ -720,16 +510,13 @@ int main(void)
     init();
 
     print_debug("Decoder Booted!\n");
-
     // process commands forever
     while (1)
     {
         print_debug("Ready\n");
-
         STATUS_LED_GREEN();
 
         result = read_packet(&cmd, uart_buf, &pkt_len);
-
         if (result < 0)
         {
             STATUS_LED_ERROR();
@@ -745,21 +532,12 @@ int main(void)
         case LIST_MSG:
             STATUS_LED_CYAN();
 
-#ifdef CRYPTO_EXAMPLE
+            #ifdef CRYPTO_EXAMPLE
             // Run the crypto example
             // TODO: Remove this from your design
             debug_secrets();
-            crypto_example();
+            #endif // CRYPTO_EXAMPLE
 
-            // if (debug_secrets()==-1){
-            //     STATUS_LED_ERROR();
-            //     print_error("Failed to read secrets\n");
-            // }
-#endif // CRYPTO_EXAMPLE
-
-            // Print the boot flag
-            // TODO: Remove this from your design
-            boot_flag();
             list_channels();
             break;
 

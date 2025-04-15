@@ -1,0 +1,7 @@
+
+- to create keys for all channels? and add channels list 
+- AES CBC encryption has no padding
+- CHEKC the blk size in AES
+
+
+//keys are always there...but decrypted only if this is true and timestamps are in valid range 

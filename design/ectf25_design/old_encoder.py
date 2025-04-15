@@ -24,7 +24,6 @@ from Cryptodome.Util import Counter
 from Crypto.Util.Padding import pad
 
 
-
 class Encoder:
     def __init__(self, secrets: bytes):
         """
@@ -41,36 +40,19 @@ class Encoder:
 
         # Load the example secrets for use in Encoder.encode
         # This will be "EXAMPLE" in the reference design"
-        self.secrets = secrets        
-        self.channels = self.secrets["channels"] 
-        self.root_key = base64.b64decode(self.secrets["root_key"])
-        self.encoder_private_key = serialization.load_pem_private_key(self.secrets["encoder_private_key"].encode("utf-8"), password=None)
-        self.encoder_public_key = serialization.load_pem_public_key(self.secrets["encoder_public_key"].encode("utf-8"))
-        self.decoder_private_key = serialization.load_pem_private_key(self.secrets["decoder_private_key"].encode("utf-8"), password=None)
-        self.decoder_public_key = serialization.load_pem_public_key(self.secrets["decoder_public_key"].encode("utf-8"))
-        self.signature_private_key = serialization.load_pem_private_key(self.secrets["signature_private_key"].encode("utf-8"), password=None)
-        self.signature_public_key = serialization.load_pem_public_key(self.secrets["signature_public_key"].encode("utf-8"))
-        self.subscription_key = base64.b64decode(self.secrets["subscription_key"])
-        self.channel_keys = self.secrets["channel_keys"]
-        
-        self.shared_key = self.encoder_private_key.exchange(ec.ECDH(), self.decoder_public_key) #why create it here again and again during the encode fn call?
-        
-        print("BLOCK SIZE: ", AES.block_size)
-        
-        
+        self.secrets = secrets
+
     def aes_encrypt(self, key: bytes, data: bytes) -> bytes:
-        iv = os.urandom(AES.block_size)# 32)
+        iv = os.urandom(32)
         # cipher_ = AES.new(key.encode("utf-8"), AES.MODE_CBC, iv.encode("utf-8"))
         # ctr = Counter.new(256, initial_value=int.from_bytes(iv, byteorder='big'))# Create an AES cipher object in CTR mode
-        # cipher = AES.new(key, AES.MODE_CBC, iv)  #: AES CBC encryption has no padding
-        # return base64.b64encode(cipher.encrypt(data))
-    
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        padded = pad(data, AES.block_size)
-        return base64.b64encode(iv + cipher.encrypt(padded))  # prepend Init Vect
+        return base64.b64encode(cipher.encrypt(data))
     
-    def ecdh(self, data:bytes) -> bytes:
-        return self.aes_encrypt(self.shared_key, data)
+    
+    def ecdh(self, encoder_private_key: ec.EllipticCurvePrivateKey, decoder_public_key: ec.EllipticCurvePublicKey, data) -> bytes:
+        shared_key = encoder_private_key.exchange(ec.ECDH(), decoder_public_key) #why create it here again and again during the encode fn call?
+        return self.aes_encrypt(shared_key, data)
     
     def encode(self, channel: int, frame: bytes, timestamp: int) -> bytes:
         """The frame encoder function
@@ -92,21 +74,20 @@ class Encoder:
         """
         # TODO: encode the satellite frames so that they meet functional and
         #  security requirements
-            
-        #encrypt the frame with the channel key
-        encrypted_frame = self.aes_encrypt(self.channel_keys[str(channel)], frame)
+        channels = self.secrets["channels"] # there should be a key for all channels right? 
+        root_key = base64.b64decode(self.secrets["root_key"])
+        encoder_private_key = serialization.load_pem_private_key(self.secrets["encoder_private_key"].encode("utf-8"), password=None)
+        encoder_public_key = serialization.load_pem_public_key(self.secrets["encoder_public_key"].encode("utf-8"))
+        decoder_private_key = serialization.load_pem_private_key(self.secrets["decoder_private_key"].encode("utf-8"), password=None)
+        decoder_public_key = serialization.load_pem_public_key(self.secrets["decoder_public_key"].encode("utf-8"))
+        signature_private_key = serialization.load_pem_private_key(self.secrets["signature_private_key"].encode("utf-8"), password=None)
+        signature_public_key = serialization.load_pem_public_key(self.secrets["signature_public_key"].encode("utf-8"))
+        subscription_key = base64.b64decode(self.secrets["subscription_key"])
+        channel_keys = self.secrets["channel_keys"]
         
-        #ecdh encrypption of pkt with the shared key
-        packet_data = {
-            "channel": channel,
-            "timestamp": timestamp,
-            "frame": encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
-        }
-        packet_cft_bytes = json.dumps(packet_data).encode("utf-8")
-        encrypted_packet = self.ecdh(packet_cft_bytes)
-        
-        #signin the encrypted pkt
-        signed_packet = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
+        encrypted_frame = self.aes_encrypt(channel_keys[str(channel)], frame)
+        encrypted_packet = self.ecdh(encoder_private_key, decoder_public_key, {"channel": channel, "timestamp": timestamp, "frame": encrypted_frame})
+        signed_packet = signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
         
         return signed_packet + encrypted_frame
 

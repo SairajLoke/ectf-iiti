@@ -19,6 +19,9 @@ import base64
 
 from loguru import logger
 
+from ectf25_design.json2h import json_to_c_header, ALL_CHANNELS_EXCEPT_0
+
+
 
 def gen_secrets(channels: list[int]) -> bytes:
     """Generate the contents secrets file with cryptographic keys
@@ -82,10 +85,10 @@ def gen_secrets(channels: list[int]) -> bytes:
     subscription_key = os.urandom(32)  # AES-256 key
     
     # Generate Channel Keys (one for each channel including emergency channel 0)
-    all_channels = list(set([0] + channels))  # Include emergency broadcast channel
+    # all_channels = list(set([0] + channels))  # Include emergency broadcast channel
     channel_keys = {}
     
-    for channel in all_channels:
+    for channel in range(1, len(ALL_CHANNELS_EXCEPT_0)+1): #to get index of standard channesl right
         # For each channel, generate an AES-GCM key
         channel_key = os.urandom(32)  # 256-bit key
         # Store as base64 for JSON compatibility
@@ -144,6 +147,8 @@ def main():
     args = parse_args()
 
     secrets = gen_secrets(args.channels)
+    secrets_header_output_path = str(args.secrets_file).split(".")[0] + ".h" #assuming .json file (not global.secrets)
+    print(f"secrets_header_output_path: {secrets_header_output_path}")
 
     # Check if the file already exists
     if args.secrets_file.exists() and not args.force:
@@ -165,6 +170,7 @@ def main():
     with open(args.secrets_file, "wb" if args.force else "xb") as f:
         # Dump the secrets to the file
         f.write(secrets)
+        json_to_c_header(json.loads(secrets.decode('utf-8')), secrets_header_output_path)
 
     # For your own debugging. Feel free to remove
     logger.success(f"Wrote secrets to {str(args.secrets_file.absolute())}")
