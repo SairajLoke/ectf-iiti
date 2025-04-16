@@ -13,6 +13,8 @@ docker run --rm -v ./decoder/:/decoder -v ./secrets/secrets.h:/secrets.h:ro -v .
 <!--  -->
 )
 
+To Add some information of the security of our decoder here
+
 
 # eCTF Insecure Example
 
