@@ -19,7 +19,7 @@ import base64
 
 from loguru import logger
 
-from ectf25_design.json2h import json_to_c_header, ALL_CHANNELS_EXCEPT_0
+from ectf25_design.json2h import json_to_c_header
 
 
 
@@ -33,7 +33,7 @@ def gen_secrets(channels: list[int]) -> bytes:
     """
     # Generate Root Key (master key for the system)
     root_key = os.urandom(32)  # 256 bits
-    
+    channels.append(0)  # Include emergency broadcast channel
     # Generate Encoder ECDSA key pair
     encoder_private_key = ec.generate_private_key(ec.SECP256R1())
     encoder_public_key = encoder_private_key.public_key()
@@ -87,8 +87,9 @@ def gen_secrets(channels: list[int]) -> bytes:
     # Generate Channel Keys (one for each channel including emergency channel 0)
     # all_channels = list(set([0] + channels))  # Include emergency broadcast channel
     channel_keys = {}
+    ALL_CHANNELS = [0, 1, 2, 3, 4, 5, 6, 7, 8] #to get index of standard channesl right
     
-    for channel in range(1, len(ALL_CHANNELS_EXCEPT_0)+1): #to get index of standard channesl right
+    for channel in ALL_CHANNELS: #to get index of standard channesl right
         # For each channel, generate an AES-GCM key
         channel_key = os.urandom(32)  # 256-bit key
         # Store as base64 for JSON compatibility

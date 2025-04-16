@@ -17,4 +17,9 @@
 
  1. rmv unnec keys from secrets
  2. add key for channel zero which would be always available
-  3. to check input frames
+3. zero key usage (by default addition on decoder)
+4. decoder id in subnss
+
+
+
+4. time stamp logic ...done 

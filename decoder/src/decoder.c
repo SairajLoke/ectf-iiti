@@ -63,47 +63,47 @@ void print_key(const uint8_t *key, size_t length)
     print_debug(buffer);
 }
 
-int debug_secrets()
-{
+// int debug_secrets()
+// {
 
-    print_debug("$$$$$$$$$$$$$$$$$$$$$$$$ Valid Channels: ");
-    for (int i = 0; i < (NUM_CHANNELS_EXCEPT_0 + 1); ++i)
-    {
-        char buf[8];
-        snprintf(buf, sizeof(buf), "%d ", VALID_CHANNELS[i]);
-        print_debug(buf);
-    }
-    print_debug("\n");
+//     print_debug("$$$$$$$$$$$$$$$$$$$$$$$$ Valid Channels: ");
+//     for (int i = 0; i < (NUM_CHANNELS_EXCEPT_0 + 1); ++i)
+//     {
+//         char buf[8];
+//         snprintf(buf, sizeof(buf), "%d ", VALID_CHANNELS[i]);
+//         print_debug(buf);
+//     }
+//     print_debug("\n");
 
-    print_debug("Root Key:");
-    print_key(ROOT_KEY, 32);
+//     print_debug("Root Key:");
+//     print_key(ROOT_KEY, 32);
 
-    print_debug("Subscription Key:");
-    print_key(SUBSCRIPTION_KEY, 32);
+//     print_debug("Subscription Key:");
+//     print_key(SUBSCRIPTION_KEY, 32);
 
-    // print_debug("Channel 0 Key:");
-    // print_key(CHANNEL_0_KEY, 32);
+//     // print_debug("Channel 0 Key:");
+//     // print_key(CHANNEL_0_KEY, 32);
 
-    print_debug("Channel 1 Key:");
-    print_key(CHANNEL_1_KEY, 32);
+//     print_debug("Channel 1 Key:");
+//     print_key(CHANNEL_1_KEY, 32);
 
-    print_debug("Channel 3 Key:");
-    print_key(CHANNEL_3_KEY, 32);
+//     print_debug("Channel 3 Key:");
+//     print_key(CHANNEL_3_KEY, 32);
 
-    print_debug("Channel 4 Key:");
-    print_key(CHANNEL_4_KEY, 32);
+//     print_debug("Channel 4 Key:");
+//     print_key(CHANNEL_4_KEY, 32);
 
-    print_debug("Encoder Public Key:");
-    print_debug(ENCODER_PUBLIC_KEY);
+//     print_debug("Encoder Public Key:");
+//     print_debug(ENCODER_PUBLIC_KEY);
 
-    print_debug("Decoder Private Key:");
-    print_debug(DECODER_PRIVATE_KEY);
+//     print_debug("Decoder Private Key:");
+//     print_debug(DECODER_PRIVATE_KEY);
 
-    print_debug("Signature Public Key:");
-    print_debug(SIGNATURE_PUBLIC_KEY);
+//     print_debug("Signature Public Key:");
+//     print_debug(SIGNATURE_PUBLIC_KEY);
 
-    return 0;
-}
+//     return 0;
+// }
 
 
 #endif // CRYPTO_EXAMPLE
@@ -126,6 +126,9 @@ int debug_secrets()
 #define MAX_FRAME_SIZE 64  //kinda redundant since we have FRAME_SIZE
 #define ENCRYPTED_PACKET_LENGTH 128 // should be max 64 + 4 + 8 
 #define CHANNEL_KEY_SIZE 32
+
+static timestamp_t prev_timestamp = 0;
+decoder_id_t THIS_DECODER_ID = getenv("DECODER_ID");
 
 /********************* STATE MACROS ***********************/
 // Calculate the flash address where we will store channel info as the 2nd to last page available
@@ -205,6 +208,40 @@ void int2str(int num) {
     }
     print_debug(str);
 }
+int perform_checks(channel_id_t channel, timestamp_t timestamp){
+    // checking all the channel conditions and timestamp conditions before decrypting the frame.
+    if (channel > MAX_CHANNEL_COUNT)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid channel number\n");
+        return -1;
+    }
+    if(channel && is_subscribed(channel) != 1)
+    {
+        STATUS_LED_RED();
+        print_error("Not subscribed to channel:  INVALID SUBSCRIPTION ATTACK HANDLED !!!\n");
+        return -1;
+    }
+    if (timestamp < decoder_status.subscribed_channels[channel].start_timestamp || timestamp > decoder_status.subscribed_channels[channel].end_timestamp)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid timestamp range\n:  EXPIRED SUBSCRIPTION ATTACK HANDLED !!!");
+        return -1;
+    }
+    if(timestamp <= prev_timestamp)
+    {
+        STATUS_LED_RED();
+        print_error("Invalid timestamp\n");
+        prev_timestamp= timestamp;
+        return -1;
+    }
+    prev_timestamp= timestamp;
+    print_debug("Subscription Valid\n");
+    print_debug("Valid timestamp range\n");
+    return 0;
+}
+
+
 
 
 /******************* UTILITY FUNCTIONS ********************/
@@ -406,7 +443,7 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
     // Decrypt the data
     uint8_t decrypted_data[128]; // Make sure this is large enough
     if (wc_AesCbcDecrypt(&aes, decrypted_data, encrypted_data, encrypted_data_len) != 0) {
-        print_debug("AES decryption failed\n");
+        print_debug("AES decryption failed:  \n");
         return -1;
     }
     
@@ -442,7 +479,7 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
         return -1;
     }
     
-    uint32_t decoder_id;
+    decoder_id_t decoder_id;
     uint64_t start_time;
     uint64_t end_time;
     uint32_t channel;
@@ -452,6 +489,11 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
     memcpy(&start_time, decrypted_data + 4, sizeof(uint64_t));
     memcpy(&end_time, decrypted_data + 12, sizeof(uint64_t));
     memcpy(&channel, decrypted_data + 20, sizeof(uint32_t));
+
+    if(decoder_id != THIS_DECODER_ID){
+        print_error("Invalid decoder ID\n");
+        return -1;
+    }
     
     subscription_update_packet_t subscription_update_packet;
     subscription_update_packet.decoder_id = decoder_id;
@@ -637,32 +679,6 @@ int handle_update_subscription_old(size_t pkt_len, uint8_t *uart_buf) {
 
 
 
-int perform_checks(channel_id_t channel, timestamp_t timestamp){
-    // checking all the channel conditions and timestamp conditions before decrypting the frame.
-    if (channel > MAX_CHANNEL_COUNT)
-    {
-        STATUS_LED_RED();
-        print_error("Invalid channel number\n");
-        return -1;
-    }
-    if(is_subscribed(channel) != 1)
-    {
-        STATUS_LED_RED();
-        print_error("Not subscribed to channel\n");
-        return -1;
-    }
-    if (timestamp < decoder_status.subscribed_channels[channel].start_timestamp || timestamp > decoder_status.subscribed_channels[channel].end_timestamp)
-    {
-        STATUS_LED_RED();
-        print_error("Invalid timestamp range\n");
-        return -1;
-    }
-
-    print_debug("Subscription Valid\n");
-    print_debug("Valid timestamp range\n");
-    return 0;
-}
-
 
 
 /** @brief Processes a packet containing frame data.
@@ -758,6 +774,13 @@ int perform_checks(channel_id_t channel, timestamp_t timestamp){
 
 // }
 
+static const uint8_t MAP_CHANNEL_KEY [9];
+
+for (int i = 0; i < sizeof(MAP_CHANNEL_KEY); i++){
+    MAP_CHANNEL_KEY[i] = 0x00;
+}
+
+
 void get_channel_key(channel_id_t channel, uint8_t *key) {
     // This function should retrieve the key for the specified channel
     // For example, it could look up the key in a predefined array or database
@@ -766,26 +789,37 @@ void get_channel_key(channel_id_t channel, uint8_t *key) {
     int2str(channel);
     //todo invalidate the channel
 
-    if (channel == 1) {
-        memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
-    } else if (channel == 2){
-        memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY));
-    } else if (channel == 3){
-        memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY));
-    } else if (channel == 4){
-        memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY));
-    } else if (channel == 5){
-        memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY));
-    } else if (channel == 6){
-        memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY));
-    } else if (channel == 7){
-        memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY));
-    } else if (channel == 8){
-        memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY));
-    } else {
-        // Invalid channel, set key to zero
-        memset(key, 0, sizeof(CHANNEL_1_KEY));
+    // for(int i = 0; i < sizeof(chan); i++){
+    //     key[i] = 0x00;
+    // }
+
+    for (int i=0; i<sizeof(VALID_CHANNELS); i++){
+        if (VALID_CHANNELS[i] == channel){
+            memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
+            break;
+        }
     }
+
+    // if (channel == 1) {
+    //     memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
+    // } else if (channel == 2){
+    //     memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY));
+    // } else if (channel == 3){
+    //     memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY));
+    // } else if (channel == 4){
+    //     memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY));
+    // } else if (channel == 5){
+    //     memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY));
+    // } else if (channel == 6){
+    //     memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY));
+    // } else if (channel == 7){
+    //     memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY));
+    // } else if (channel == 8){
+    //     memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY));
+    // } else {
+    //     // Invalid channel, set key to zero
+    //     memset(key, 0, sizeof(CHANNEL_1_KEY));
+    // }
 
 
 }
@@ -793,20 +827,26 @@ void get_channel_key(channel_id_t channel, uint8_t *key) {
 
 int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
 
+
     int2str(pkt_len); //108 (4 + 8 + (16+64) ..extra 16 ig padding 
     print_debug("Decoding data...\n");
     char output_buf[1024] = {0};
-    sprintf(output_buf, "Frame data length: %d, uart_buf: %p", pkt_len, uart_buf);
-    if (pkt_len < sizeof(output_buf)){output_buf[pkt_len] = '\0';} // Initialize the buffer to an empty string //making sure pkt len is under 1024 to avoid mem overrides
-    print_debug(output_buf);
-    print_debug("UART buffer: ");
+    // sprintf(output_buf, "Frame data length: %d, uart_buf: %p", pkt_len, uart_buf);
+    // if (pkt_len < sizeof(output_buf)){output_buf[pkt_len] = '\0';} // Initialize the buffer to an empty string //making sure pkt len is under 1024 to avoid mem overrides
+    // print_debug(output_buf);
+    // print_debug("UART buffer: ");
 
 
     frame_packet_t frame_packet;
     memcpy(&frame_packet.channel, uart_buf, sizeof(frame_packet.channel));
     memcpy(&frame_packet.timestamp, uart_buf + sizeof(frame_packet.channel), sizeof(frame_packet.timestamp));
-    uint8_t* encrypted_frame = uart_buf + sizeof(frame_packet.channel) + sizeof(frame_packet.timestamp);
+    if(perform_checks(frame_packet.channel, frame_packet.timestamp) != 0){
+        print_error("valid frame constraints not satified\n");
+        return -1;
+    }
+   
 
+    uint8_t* encrypted_frame = uart_buf + sizeof(frame_packet.channel) + sizeof(frame_packet.timestamp);
     sprintf(output_buf,"Frame time: %llu, Channel: %u\n", (unsigned long long)frame_packet.timestamp, frame_packet.channel);
     print_debug(output_buf);
 
@@ -825,7 +865,7 @@ int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
     print_debug("Encrypted frame data length: ");
     int2str(encrypted_frame_data_len);
 
-    uint8_t decrypted_buf[128] = {0}; // Adjust size as needed note using frame.data for decryption will make it wrong coz encrypted is padded ( it turns out to be 80 bytes)
+    uint8_t decrypted_buf[1024] = {0}; // Adjust size as needed note using frame.data for decryption will make it wrong coz encrypted is padded ( it turns out to be 80 bytes)
 
 
     //  Initialize AES
@@ -846,7 +886,7 @@ int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
     }
 
     print_debug("Decrypted frame data successfully\n");
-    uint8_t padding_size = frame_packet.data[frame_n_iv_size - 1];
+    uint8_t padding_size = decrypted_buf[encrypted_frame_data_len - 1];
     
 
     // char output_buf[128] = {0};
@@ -1270,7 +1310,7 @@ int main(void)
             // Run the crypto example
             // crypto_example();
             // // TODO: Remove this from your design
-            // debug_secrets();
+            // debug_secrets(); dont
             #endif // CRYPTO_EXAMPLE
 
             list_channels();

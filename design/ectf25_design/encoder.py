@@ -31,7 +31,8 @@ logging.disable(logging.CRITICAL)
 
 class Encoder:
     def __init__(self, secrets: bytes):
-
+        os.makedirs("design/logs", exist_ok=True)
+        
         logging.basicConfig(filename="design/logs/encoder.log", 
                             level=logging.DEBUG, 
                             format="%(asctime)s || %(levelname)s || %(message)s || %(funcName)s || %(lineno)d")

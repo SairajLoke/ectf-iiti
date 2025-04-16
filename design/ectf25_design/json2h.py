@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 
 
-ALL_CHANNELS_EXCEPT_0 = [ 1, 2, 3, 4, 5, 6, 7, 8]
+# ALL_CHANNELS_EXCEPT_0 = [ 1, 2, 3, 4, 5, 6, 7, 8]
 
 def json_to_c_header(secrets, header_file):
     """Convert a JSON secrets file to a C header file"""
@@ -32,9 +32,14 @@ def json_to_c_header(secrets, header_file):
     # Add channels
     # channels = secrets.get("channels", []) 
     
-    header += f"#define NUM_CHANNELS_EXCEPT_0 {len(ALL_CHANNELS_EXCEPT_0)}\n"  # including channel 0
-    header += f"static const uint8_t VALID_CHANNELS[] = {{0, {', '.join(str(c) for c in ALL_CHANNELS_EXCEPT_0)}}};\n\n"
+    # header += f"#define NUM_CHANNELS_EXCEPT_0 {len(ALL_CHANNELS_EXCEPT_0)}\n"  # including channel 0
+    # header += f"static const uint8_t VALID_CHANNELS[] = {{0, {', '.join(str(c) for c in ALL_CHANNELS_EXCEPT_0)}}};\n\n"
+    # VALU = {{0, {', '.join(str(c) for c in ALL_CHANNELS_EXCEPT_0)}}}
+    # header += f"static const uint8_t VALID_CHANNELS[] = {VALU};\n\n"
     
+    # header += f"static const uint8_t VALID_CHANNELS[ ] = {" + f"{', '.join(str(c) for c in secrets["channels"])}"+ "};\n\n"
+    header += "static const uint8_t VALID_CHANNELS[] = {" + ", ".join(map(str, secrets["channels"])) + "};\n\n"
+
     # Add root key
     root_key_b64 = secrets.get("root_key", "")
     root_key = base64.b64decode(root_key_b64)
