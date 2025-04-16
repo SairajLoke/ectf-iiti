@@ -45,61 +45,7 @@ int aes_decrypt_cbc(const uint8_t *encrypted_data, size_t encrypted_data_len,
  * @return 0 if the signature is valid, non-zero if invalid.
  * 
  */
-int verify_signature(
-    unsigned char *message, 
-    size_t message_len, 
-    unsigned char *signature, 
-    size_t signature_len, 
-    const char *public_key)
-{
-    byte der[512];
-    word32 derSize = sizeof(der);
 
-    int ret = wc_KeyPemToDer((const byte *)public_key, (word32)strlen(public_key), der, derSize, NULL);
-    if (ret < 0)
-    {
-        printf("PEM to DER failed: %d\n", ret);
-        return -1;
-    }
-    derSize = ret;
-
-    ecc_key pubKey;
-    wc_ecc_init(&pubKey);
-
-    ret = wc_EccPublicKeyDecode(der, NULL, &pubKey, derSize);
-    if (ret < 0)
-    {
-        printf("Public key decode failed: %d\n", ret);
-        wc_ecc_free(&pubKey);
-        return -1;
-    }
-
-    // Compute hash of the message (ECDSA signs/verifies the hash)
-    byte hash[SHA256_DIGEST_SIZE];
-    ret = wc_Sha256Hash(message, message_len, hash);
-    if (ret != 0)
-    {
-        printf("SHA-256 hash failed: %d\n", ret);
-        wc_ecc_free(&pubKey);
-        return -1;
-    }
-
-    // Verify the signature
-    int verify_result;
-    ret = wc_ecc_verify_hash(signature, (word32)signature_len,
-                             hash, SHA256_DIGEST_SIZE,
-                             &verify_result, &pubKey);
-
-    wc_ecc_free(&pubKey);
-
-    if (ret < 0)
-    {
-        printf("Signature verification failed: %d\n", ret);
-        return -1;
-    }
-
-    return !verify_result;  // 0 = valid,  non-zero(1) = invalid
-}
 
 
 // int verify_signature(

@@ -30,7 +30,7 @@ class _Encoder:
 
     def encode(self, channel: int, frame: bytes, timestamp: int) -> bytes:
         logger.warning(
-            "\nCould not find ectf_encoder.Encoder! Make sure ectf25_design has been"
+            "\nCould not find ectf_encoder.Encoder! Make sure ectf25_design has been &&&&& "
             " pip-installed to this python with:"
             f"\n\t{sys.executable} -m pip install ./design"
             "\nFrom the root of the repository."
@@ -40,10 +40,20 @@ class _Encoder:
 
 
 try:
-    from ectf25_design.encoder import Encoder
+    import sys 
+    # sys.path.append("./design/")
+    # sys.path.append("./design/ectf25_design/")
+    # sys.path.append(".")
+    
+    # from encoder import Encoder 
+    # from ectf25_design.encoder import Encoder
+    from design.ectf25_design.encoder import Encoder
+    print("Encoder imported")
+    
 except ImportError:
     import sys
-
+    
+    
     logger.warning(
         "\nCould not find ectf_encoder.Encoder! Make sure ectf25_design has been"
         " pip-installed to this python with:"

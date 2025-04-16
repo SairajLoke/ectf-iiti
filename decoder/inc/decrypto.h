@@ -14,6 +14,7 @@
 // #include "wolfssl/wolfcrypt/ecdsa.h" nothing like this
 #include "wolfssl/wolfcrypt/asn_public.h"  // Needed for KeyPemToDer
 #include "wolfssl/wolfcrypt/aes.h"
+// #include "host_messaging.h" // For msg_type_t
 
 #define AES_KEY_SIZE 32
 #define AES_IV_SIZE 16

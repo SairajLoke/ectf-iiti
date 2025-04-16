@@ -66,7 +66,7 @@ class Encoder:
         # return base64.b64encode(cipher.encrypt(data))
     
         cipher = AES.new(key, AES.MODE_CBC, iv)
-        padded = pad(data, AES.block_size)
+        padded = pad(data, AES.block_size) # https://pycryptodome.readthedocs.io/en/latest/src/util/util.html
         return base64.b64encode(iv + cipher.encrypt(padded))  # prepend Init Vect
     
     def ecdh(self, data:bytes) -> bytes:
@@ -109,8 +109,10 @@ class Encoder:
         #signin the encrypted pkt
         signed_certificate = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
         # check len opf signed certificate
-        
-        
+        print("signed certificate len: ", len(signed_certificate))
+        print("signed certificate: ", signed_certificate)
+        import time 
+        time.sleep(5)
         return signed_certificate + encrypted_packet
 
 
@@ -133,6 +135,7 @@ def main():
 
     encoder = Encoder(args.secrets_file.read())
     print(repr(encoder.encode(args.channel, args.frame.encode(), args.timestamp)))
+    
 
 
 if __name__ == "__main__":

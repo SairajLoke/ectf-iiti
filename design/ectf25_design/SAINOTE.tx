@@ -13,3 +13,7 @@
  An attacker could tamper with the ciphertext (like flipping bits), and the decryption could still proceed without errors — but produce garbage data.
  padding oracle or bit-flipping attacks.
  //but i am assuing this scenario wont occur
+
+
+ 1. rmv unnec keys from secrets
+ 2. add key for channel zero which would be always available
