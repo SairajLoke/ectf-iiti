@@ -123,6 +123,10 @@ int debug_secrets()
 // This is a canary value so we can confirm whether this decoder has booted before
 #define FLASH_FIRST_BOOT 0xDEADBEEF
 
+#define MAX_FRAME_SIZE 64  //kinda redundant since we have FRAME_SIZE
+#define ENCRYPTED_PACKET_LENGTH 128 // should be max 64 + 4 + 8 
+#define CHANNEL_KEY_SIZE 32
+
 /********************* STATE MACROS ***********************/
 // Calculate the flash address where we will store channel info as the 2nd to last page available
 #define FLASH_STATUS_ADDR ((MXC_FLASH_MEM_BASE + MXC_FLASH_MEM_SIZE) - (2 * MXC_FLASH_PAGE_SIZE))
@@ -411,8 +415,9 @@ int handle_update_subscription(size_t pkt_len, uint8_t *uart_buf) {
     
     // Handle PKCS7 padding (manually for demonstration)
     uint8_t padding_value = decrypted_data[encrypted_data_len - 1];
-    char padding_value_str[10];
-    sprintf("Padding value: %u\n", padding_value);
+    // char padding_value_str[10];
+    // sprintf(padding_value_str, "Padding value: %u\n", padding_value);
+    // print_debug(padding_value_str); fishy 
 
     if (padding_value > AES_BLOCK_SIZE || padding_value == 0) {
         print_debug("Invalid padding detected\n");
@@ -753,15 +758,119 @@ int perform_checks(channel_id_t channel, timestamp_t timestamp){
 
 // }
 
+void get_channel_key(channel_id_t channel, uint8_t *key) {
+    // This function should retrieve the key for the specified channel
+    // For example, it could look up the key in a predefined array or database
+    // Here, we just set it to a dummy value for demonstration purposes
+    print_debug("fetching key for channel :");
+    int2str(channel);
+    //todo invalidate the channel
+
+    if (channel == 1) {
+        memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
+    } else if (channel == 2){
+        memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY));
+    } else if (channel == 3){
+        memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY));
+    } else if (channel == 4){
+        memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY));
+    } else if (channel == 5){
+        memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY));
+    } else if (channel == 6){
+        memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY));
+    } else if (channel == 7){
+        memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY));
+    } else if (channel == 8){
+        memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY));
+    } else {
+        // Invalid channel, set key to zero
+        memset(key, 0, sizeof(CHANNEL_1_KEY));
+    }
+
+
+}
+
+
 int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
 
-    int2str(pkt_len);
+    int2str(pkt_len); //108 (4 + 8 + (16+64) ..extra 16 ig padding 
     print_debug("Decoding data...\n");
     char output_buf[1024] = {0};
-    sprintf(output_buf, "Frame data  %s", uart_buf);
-    output_buf[pkt_len] = '\0'; // Initialize the buffer to an empty string
+    sprintf(output_buf, "Frame data length: %d, uart_buf: %p", pkt_len, uart_buf);
+    if (pkt_len < sizeof(output_buf)){output_buf[pkt_len] = '\0';} // Initialize the buffer to an empty string //making sure pkt len is under 1024 to avoid mem overrides
     print_debug(output_buf);
     print_debug("UART buffer: ");
+
+
+    frame_packet_t frame_packet;
+    memcpy(&frame_packet.channel, uart_buf, sizeof(frame_packet.channel));
+    memcpy(&frame_packet.timestamp, uart_buf + sizeof(frame_packet.channel), sizeof(frame_packet.timestamp));
+    uint8_t* encrypted_frame = uart_buf + sizeof(frame_packet.channel) + sizeof(frame_packet.timestamp);
+
+    sprintf(output_buf,"Frame time: %llu, Channel: %u\n", (unsigned long long)frame_packet.timestamp, frame_packet.channel);
+    print_debug(output_buf);
+
+
+    int frame_n_iv_size = pkt_len - (sizeof(frame_packet.channel) + sizeof(frame_packet.timestamp));
+    uint8_t iv_frame[AES_BLOCK_SIZE]; //16
+    memcpy(iv_frame,  encrypted_frame , AES_BLOCK_SIZE);  //shitt!
+
+    // //---------------------------
+    uint8_t channel_key [CHANNEL_KEY_SIZE]; // Adjust size as needed
+    get_channel_key(frame_packet.channel, channel_key);
+    // uint8_t decrypted_frame_data[MAX_FRAME_SIZE]; // Adjust size as needed
+    
+    uint8_t *encrypted_frame_data = encrypted_frame + AES_BLOCK_SIZE;
+    int encrypted_frame_data_len = frame_n_iv_size - AES_BLOCK_SIZE ;
+    print_debug("Encrypted frame data length: ");
+    int2str(encrypted_frame_data_len);
+
+    uint8_t decrypted_buf[128] = {0}; // Adjust size as needed note using frame.data for decryption will make it wrong coz encrypted is padded ( it turns out to be 80 bytes)
+
+
+    //  Initialize AES
+    Aes aes;
+    if (wc_AesInit(&aes, NULL, 0) != 0) {
+        print_debug("AES initialization failed\n");
+        return -1;
+    }
+    // Set up decryption
+    if (wc_AesSetKey(&aes, channel_key, CHANNEL_KEY_SIZE, iv_frame, AES_DECRYPTION) != 0) {
+        print_debug("Setting AES key failed\n");
+        return -1;
+    }
+    // Decrypt the frame data using the channel key
+    if (wc_AesCbcDecrypt(&aes, decrypted_buf, encrypted_frame_data, encrypted_frame_data_len) != 0) { //WOLFSSL_API int  wc_AesCbcDecrypt(Aes* aes, byte* out , const byte* in, word32 sz);
+        print_debug("AES decryption failed\n");
+        return -1;
+    }
+
+    print_debug("Decrypted frame data successfully\n");
+    uint8_t padding_size = frame_packet.data[frame_n_iv_size - 1];
+    
+
+    // char output_buf[128] = {0};
+    // sprintf(output_buf, "Decrypted frame data: %s\n", decrypted_frame_data);
+    // print_debug(output_buf);
+
+    // // decode(frame_n_iv_size, decrypted_frame_data);
+    write_packet(DECODE_MSG, &decrypted_buf, encrypted_frame_data_len-padding_size);
+
+    return 0;
+    // Example data you want to debug
+    // uint8_t data[] = {0x3a, 0x8f, 0x93, 0xb2, 0xf4, 0xe2, 0xc1, 0xd9, 0x00};  // Some example data
+    // // Call the write_hex function to print the data in hex format
+    // int result = write_hex(DEBUG_MSG, data, sizeof(data));
+
+    // // If it returns a non-negative result, it means the hex data was printed successfully
+    // if (result == 0) {
+    //     print_debug("Data printed successfully in hex format.\n");
+    // } else {
+    //     print_debug("Failed to print hex data.\n");
+    // }
+
+
+
 
 
     // Signature and message extraction from new frame
@@ -806,92 +915,14 @@ int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
     // }
 
     // print_debug("Decrypted frame data successfully\n");
-
     // // Extract the frame data
     // char output[128];
 
-    // frame_packet_t frame_packet;
-    // memcpy(&frame_packet, new_frame_packet, sizeof(frame_packet_t));
-    // sprintf(output,"Frame time: %s , Channel: %s\n", frame_packet.timestamp, frame_packet.channel);
-    // print_debug(output);
-
-    // uint8_t *encrypted_frame = decrypted_frame->data;
-    // int frame_n_iv_size = pkt_len - (sizeof(decrypted_frame->channel) + sizeof(decrypted_frame->timestamp));
-
-    // uint8_t iv_frame[AES_BLOCK_SIZE]; //could be 32
-    // memcpy(iv_frame, encrypted_frame , AES_BLOCK_SIZE);
-
-    // //---------------------------
-    // uint8_t channel_key [CHANNEL_KEY_SIZE]; // Adjust size as needed
-    // get_channel_key(decrypted_frame->channel, channel_key);
-    // uint8_t decrypted_frame_data[MAX_FRAME_SIZE]; // Adjust size as needed
-    
-    // uint8_t *encrypted_frame_data = encrypted_frame + AES_BLOCK_SIZE;
-    // int encrypted_frame_data_len = frame_n_iv_size - AES_BLOCK_SIZE;
-
-
-    //  Initialize AES
-    // Aes aes;
-    // if (wc_AesInit(&aes, NULL, 0) != 0) {
-    //     print_debug("AES initialization failed\n");
-    //     return -1;
-    // }
-    // // Set up decryption
-    // if (wc_AesSetKey(&aes, channel_key, CHANNEL_KEY_SIZE, iv_frame, AES_DECRYPTION) != 0) {
-    //     print_debug("Setting AES key failed\n");
-    //     return -1;
-    // }
-    // // Decrypt the frame data using the channel key
-    // if (wc_AesCbcDecrypt(&aes, decrypted_frame_data, encrypted_frame_data, encrypted_frame_data_len) != 0) { //WOLFSSL_API int  wc_AesCbcDecrypt(Aes* aes, byte* out , const byte* in, word32 sz);
-    //     print_debug("AES decryption failed\n");
-    //     return -1;
-    // }
-
-    // char output_buf[128] = {0};
-    // sprintf(output_buf, "Decrypted frame data: %s\n", decrypted_frame_data);
-    // print_debug(output_buf);
-
-    // // decode(frame_n_iv_size, decrypted_frame_data);
-    // write_packet(DECODE_MSG, decrypted_frame->data, encrypted_frame_data_len);
-
 
 }
 
 
-void get_channel_key(channel_id_t channel, uint8_t *key) {
-    // This function should retrieve the key for the specified channel
-    // For example, it could look up the key in a predefined array or database
-    // Here, we just set it to a dummy value for demonstration purposes
 
-    //todo invalidate the channel
-
-    if (channel == 1) {
-        memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
-    } else if (channel == 2){
-        memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY));
-    } else if (channel == 3){
-        memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY));
-    } else if (channel == 4){
-        memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY));
-    } else if (channel == 5){
-        memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY));
-    } else if (channel == 6){
-        memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY));
-    } else if (channel == 7){
-        memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY));
-    } else if (channel == 8){
-        memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY));
-    } else {
-        // Invalid channel, set key to zero
-        memset(key, 0, sizeof(CHANNEL_1_KEY));
-    }
-
-
-}
-
-#define MAX_FRAME_SIZE 64
-#define ENCRYPTED_PACKET_LENGTH 128 // should be max 64 + 4 + 8 
-#define CHANNEL_KEY_SIZE 32
 
 int verify_signature(
     unsigned char *message, 

@@ -25,9 +25,18 @@ from Crypto.Util.Padding import pad
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
+import logging
+
+logging.disable(logging.CRITICAL)
 
 class Encoder:
     def __init__(self, secrets: bytes):
+
+        logging.basicConfig(filename="design/logs/encoder.log", 
+                            level=logging.DEBUG, 
+                            format="%(asctime)s || %(levelname)s || %(message)s || %(funcName)s || %(lineno)d")
+
+        self.logger = logging.getLogger(__name__)
         """
         You **may not** change the arguments or returns of this function!
 
@@ -58,6 +67,18 @@ class Encoder:
         
         
         self.shared_key = self.encoder_private_key.exchange(ec.ECDH(), self.decoder_public_key) #why create it here again and again during the encode fn call?
+        logging.info(f"type: {type(self.root_key)}, root key: {self.root_key}")
+        logging.info(f" type: {type(self.encoder_private_key)}, encoder private key: {self.encoder_private_key}")
+        logging.info(f"type: {type(self.encoder_public_key)}, encoder public key: {self.encoder_public_key}")
+        logging.info(f"d type: {type(self.decoder_private_key)}, decoder private key: {self.decoder_private_key}")
+        logging.info(f" type: {type(self.decoder_public_key)}, decoder public key: {self.decoder_public_key}")
+        logging.info(f" type: {type(self.signature_private_key)}, signature private key: {self.signature_private_key}")
+        logging.info(f" type: {type(self.signature_public_key)}, signature public key: {self.signature_public_key}")
+        logging.info(f"type: {type(self.subscription_key)}, subscription key: {self.subscription_key}")
+        logging.info(f"channel keys len: {len(self.channel_keys)}, type: {type(self.channel_keys)}, channel keys: {self.channel_keys}")  
+        logging.info(f"type: {type(self.shared_key)}, shared key: {self.shared_key}")
+        
+    
         # self.shared_key = HKDF(
         #             algorithm=hashes.SHA256(),
         #             length=32,
@@ -76,10 +97,16 @@ class Encoder:
         # ctr = Counter.new(256, initial_value=int.from_bytes(iv, byteorder='big'))# Create an AES cipher object in CTR mode
         # cipher = AES.new(key, AES.MODE_CBC, iv)  #: AES CBC encryption has no padding
         # return base64.b64encode(cipher.encrypt(data))
-    
+        logging.info(f"\n")
+        logging.info(f"Len of Raw data : {len(data)}, type: {type(data)}, data: {data}")
+        logging.info(f"Len of key : {len(key)}, type: {type(key)}, key: {key}")
+        logging.info(f"Len of iv : {len(iv)}, type: {type(iv)}, iv: {iv}")
+        
         cipher = AES.new(key, AES.MODE_CBC, iv)
         padded = pad(data, AES.block_size) # https://pycryptodome.readthedocs.io/en/latest/src/util/util.html
-        return base64.b64encode(iv + cipher.encrypt(padded))  # prepend Init Vect
+        logging.info(f"\nPadded data: {padded}")
+        
+        return iv + cipher.encrypt(padded) #base64.b64encode()  # prepend Init Vect
     
     def ecdh(self, data:bytes) -> bytes:
         return self.aes_encrypt(self.shared_key, data)
@@ -102,14 +129,14 @@ class Encoder:
 
         :returns: The encoded frame, which will be sent to the Decoder
         """
-        print("frame: ", frame)
-        # TODO: encode the satellite frames so that they meet functional and
-        #  security requirements
+        logging.info(f"frame: {frame}")
+        print("channel key: ", len(self.channel_keys[str(channel)]))
+        logging.info(f"channel key: {len(self.channel_keys[str(channel)])}")
             
         #encrypt the frame with the channel key
-        print("channel key: ", len(self.channel_keys[str(channel)]))
         encrypted_frame = self.aes_encrypt(self.channel_keys[str(channel)], frame)
         print("encrypted frame: ", encrypted_frame)
+        logging.info(f"encrypted frame: {encrypted_frame}")
         
         #ecdh encrypption of pkt with the shared key
         # packet_data = {
@@ -123,10 +150,15 @@ class Encoder:
         print("channel: ", channel)
         print("timestamp: ", timestamp)
         print("encrypted frame: ", encrypted_frame)
+        
+        logging.info(f"channel: {channel}, timestamp: {timestamp}, encrypted frame: {encrypted_frame}")
+        logging.info(f"Bytes (bytes(channel) {bytes(channel)}, bytes(5) {bytes(5)} ,bytes(timestamp): , encrypted_frame: {encrypted_frame})")
+        
         # return bytes(channel) + bytes(timestamp) + encrypted_frame
+        # return bytes(channel) + bytes(timestamp) + encrypted_frame#"hello world".encode("utf-8")...very very wrong...its returning channel number of bytes
+
+        return channel.to_bytes(4, byteorder='little') + timestamp.to_bytes(8, byteorder='little') + encrypted_frame #+ encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
         
-        
-        return "hello world".encode("utf-8")
         # packet_cft_bytes = json.dumps(packet_data).encode("utf-8")
         # encrypted_packet = self.ecdh(packet_cft_bytes)
         # return encrypted_packet

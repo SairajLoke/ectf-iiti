@@ -63,6 +63,9 @@ def gen_subscription(
     encryptor = cipher.encryptor()
     encrypted_data = encryptor.update(padded_data) + encryptor.finalize()
     
+    print("len of encrypted data {len(encrypted_data)} , type: {type(encrypted_data)}, encrypted data: {encrypted_data}")
+     
+    
     # Combine IV and encrypted data
     return iv + encrypted_data
 
