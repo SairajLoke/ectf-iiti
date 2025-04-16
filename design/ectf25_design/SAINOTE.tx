@@ -17,3 +17,4 @@
 
  1. rmv unnec keys from secrets
  2. add key for channel zero which would be always available
+  3. to check input frames

@@ -21,7 +21,8 @@ from collections import namedtuple
 from loguru import logger
 from tqdm import tqdm
 
-from ectf25.utils import Encoder
+# from ectf25.utils import Encoder
+from ectf25_design.encoder import Encoder
 from ectf25.utils.decoder import DecoderIntf
 
 Frame = namedtuple("Frame", ["channel", "data", "timestamp"])

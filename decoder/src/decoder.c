@@ -668,8 +668,8 @@ int perform_checks(channel_id_t channel, timestamp_t timestamp){
  *  @return 0 if successful.  -1 if data is from unsubscribed channel.
  */
 // packet[message[frame,channel,timestamp], signature]
-int decode(pkt_len_t pkt_len, frame_packet_t *new_frame_packet)
-{ return 0;
+// int decode(pkt_len_t pkt_len, frame_packet_t *new_frame_packet)
+// { return 0;
 //     // Check that the packet is the correct size
 //     // if (pkt_len != (sizeof(frame_packet_t) + SIGNATURE_LENGTH))
 //     // {
@@ -751,7 +751,112 @@ int decode(pkt_len_t pkt_len, frame_packet_t *new_frame_packet)
 //     write_packet(DECODE_MSG, decrypted_frame->data, frame_size);
 //     return 0;
 
+// }
+
+int new_handle_new_decode(pkt_len_t pkt_len, uint8_t *uart_buf){
+
+    int2str(pkt_len);
+    print_debug("Decoding data...\n");
+    char output_buf[1024] = {0};
+    sprintf(output_buf, "Frame data  %s", uart_buf);
+    output_buf[pkt_len] = '\0'; // Initialize the buffer to an empty string
+    print_debug(output_buf);
+    print_debug("UART buffer: ");
+
+
+    // Signature and message extraction from new frame
+    // size_t signature_len = 64; // 64 bytes for ECDSA signature (32 bytes for r and 32 bytes for s)
+    // uint8_t *signature = uart_buf;                         // Points to first 64 bytes
+    // size_t message_len = pkt_len - SIGNATURE_LENGTH ; //ig not .....sizeof(new_frame) - signature_len;
+    // //TODO check the ptr arithmetic here
+    // uint8_t *encrypted_message = signature + SIGNATURE_LENGTH ; // Points to the encrypted message part
+
+    // uint8_t signature_buf[64];
+    // memcpy(signature_buf, uart_buf, SIGNATURE_LENGTH);
+    // print_debug("Signature: ");
+    // print_debug(signature_buf);
+    
+    // //verifty the signture 
+    // int result = verify_signature(encrypted_message, message_len, signature, SIGNATURE_LENGTH, SIGNATURE_PUBLIC_KEY);
+    // if (result != 0){
+    //     STATUS_LED_RED();
+    //     print_error("FAILED to VERIFY SIGNATURE\n");
+    //     return -1;
+    // }
+    // print_debug("Signature verified successfully\n");
+
+
+
+    // // Perform ECDH Decryption to obtain the packet, // perform ecdsa decryption using the private key of decoder on the packet
+    
+    // uint8_t iv[AES_BLOCK_SIZE]; //could be 32
+    // memcpy(iv, encrypted_message, AES_BLOCK_SIZE);
+
+    // uint8_t *encrypted_packet = encrypted_message + AES_BLOCK_SIZE;
+
+    // int encrypted_packet_len = (int)pkt_len - SIGNATURE_LENGTH - AES_BLOCK_SIZE;
+
+    // uint8_t decrypted_packet[ENCRYPTED_PACKET_LENGTH]; // Adjust size as needed
+
+    // if(ecdh_decrypt(DECODER_PRIVATE_KEY, ENCODER_PUBLIC_KEY, iv, encrypted_packet, encrypted_packet_len, decrypted_packet) != 0) //returns non-zero on failure //can be checked if(condition)...but doint explicity != 0 readability
+    // {
+    //     STATUS_LED_RED();
+    //     print_error("Failed to decrypt frame data\n");
+    //     return -1;
+    // }
+
+    // print_debug("Decrypted frame data successfully\n");
+
+    // // Extract the frame data
+    // char output[128];
+
+    // frame_packet_t frame_packet;
+    // memcpy(&frame_packet, new_frame_packet, sizeof(frame_packet_t));
+    // sprintf(output,"Frame time: %s , Channel: %s\n", frame_packet.timestamp, frame_packet.channel);
+    // print_debug(output);
+
+    // uint8_t *encrypted_frame = decrypted_frame->data;
+    // int frame_n_iv_size = pkt_len - (sizeof(decrypted_frame->channel) + sizeof(decrypted_frame->timestamp));
+
+    // uint8_t iv_frame[AES_BLOCK_SIZE]; //could be 32
+    // memcpy(iv_frame, encrypted_frame , AES_BLOCK_SIZE);
+
+    // //---------------------------
+    // uint8_t channel_key [CHANNEL_KEY_SIZE]; // Adjust size as needed
+    // get_channel_key(decrypted_frame->channel, channel_key);
+    // uint8_t decrypted_frame_data[MAX_FRAME_SIZE]; // Adjust size as needed
+    
+    // uint8_t *encrypted_frame_data = encrypted_frame + AES_BLOCK_SIZE;
+    // int encrypted_frame_data_len = frame_n_iv_size - AES_BLOCK_SIZE;
+
+
+    //  Initialize AES
+    // Aes aes;
+    // if (wc_AesInit(&aes, NULL, 0) != 0) {
+    //     print_debug("AES initialization failed\n");
+    //     return -1;
+    // }
+    // // Set up decryption
+    // if (wc_AesSetKey(&aes, channel_key, CHANNEL_KEY_SIZE, iv_frame, AES_DECRYPTION) != 0) {
+    //     print_debug("Setting AES key failed\n");
+    //     return -1;
+    // }
+    // // Decrypt the frame data using the channel key
+    // if (wc_AesCbcDecrypt(&aes, decrypted_frame_data, encrypted_frame_data, encrypted_frame_data_len) != 0) { //WOLFSSL_API int  wc_AesCbcDecrypt(Aes* aes, byte* out , const byte* in, word32 sz);
+    //     print_debug("AES decryption failed\n");
+    //     return -1;
+    // }
+
+    // char output_buf[128] = {0};
+    // sprintf(output_buf, "Decrypted frame data: %s\n", decrypted_frame_data);
+    // print_debug(output_buf);
+
+    // // decode(frame_n_iv_size, decrypted_frame_data);
+    // write_packet(DECODE_MSG, decrypted_frame->data, encrypted_frame_data_len);
+
+
 }
+
 
 void get_channel_key(channel_id_t channel, uint8_t *key) {
     // This function should retrieve the key for the specified channel
@@ -858,7 +963,7 @@ int verify_signature(
     return !verify_result;  // 0 = valid,  non-zero(1) = invalid
 }
 
-int handle_decode(size_t pkt_len, uint8_t *uart_buf) {
+int old_handle_decode(size_t pkt_len, uint8_t *uart_buf) {
 
     int2str(pkt_len);
 
@@ -1143,7 +1248,7 @@ int main(void)
         // Handle decode command
         case DECODE_MSG:
             STATUS_LED_PURPLE();
-            handle_decode(pkt_len, uart_buf);
+            new_handle_new_decode(pkt_len, uart_buf);
             // old_decode(pkt_len, (frame_packet_t *)uart_buf);
             break;
 

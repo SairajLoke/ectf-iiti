@@ -20,7 +20,8 @@ from typing import Iterator
 
 from loguru import logger
 
-from ectf25.utils import Encoder
+# from ectf25.utils import Encoder
+from ectf25_design.encoder import Encoder
 from ectf25.utils.decoder import DecoderIntf
 
 

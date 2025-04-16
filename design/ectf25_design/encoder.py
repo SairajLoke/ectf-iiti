@@ -19,9 +19,10 @@ import json
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives import serialization
-from Cryptodome.Cipher import AES
-from Cryptodome.Util import Counter
+from Crypto.Cipher import AES
+from Crypto.Util import Counter
 from Crypto.Util.Padding import pad
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 
 
@@ -52,10 +53,21 @@ class Encoder:
         self.signature_public_key = serialization.load_pem_public_key(self.secrets["signature_public_key"].encode("utf-8"))
         self.subscription_key = base64.b64decode(self.secrets["subscription_key"])
         self.channel_keys = self.secrets["channel_keys"]
+        for key in self.channel_keys:
+            self.channel_keys[key] = base64.b64decode(self.channel_keys[key])
+        
         
         self.shared_key = self.encoder_private_key.exchange(ec.ECDH(), self.decoder_public_key) #why create it here again and again during the encode fn call?
-        
+        # self.shared_key = HKDF(
+        #             algorithm=hashes.SHA256(),
+        #             length=32,
+        #             salt=None,
+        #             info=b'handshake data',
+        #             ).derive(self.temp_key)
+
         print("BLOCK SIZE: ", AES.block_size)
+        print("KEY SIZE: ", len(self.shared_key))
+        # print("KEY: SIZE TEMP_KEY: ", len(self.temp_key))
         
         
     def aes_encrypt(self, key: bytes, data: bytes) -> bytes:
@@ -90,30 +102,46 @@ class Encoder:
 
         :returns: The encoded frame, which will be sent to the Decoder
         """
+        print("frame: ", frame)
         # TODO: encode the satellite frames so that they meet functional and
         #  security requirements
             
         #encrypt the frame with the channel key
+        print("channel key: ", len(self.channel_keys[str(channel)]))
         encrypted_frame = self.aes_encrypt(self.channel_keys[str(channel)], frame)
+        print("encrypted frame: ", encrypted_frame)
         
         #ecdh encrypption of pkt with the shared key
-        packet_data = {
-            "channel": channel,
-            "timestamp": timestamp,
-            "frame": base64.b64encode(encrypted_frame).decode("utf-8") #encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
-        }
+        # packet_data = {
+        #     "channel": channel,
+        #     "timestamp": timestamp,
+        #     "frame": encrypted_frame #encrypted_frame).decode("utf-8") #encrypted_frame.decode("utf-8") # Convert bytes to string for JSON serialization???
+        # }
+        # print("packet frame: ", packet_data)
+        # print( "data", packet_data["channel"], packet_data["timestamp"], packet_data["frame"])
+        # return json.dumps(packet_data).encode("utf-8")
+        print("channel: ", channel)
+        print("timestamp: ", timestamp)
+        print("encrypted frame: ", encrypted_frame)
+        # return bytes(channel) + bytes(timestamp) + encrypted_frame
         
-        packet_cft_bytes = json.dumps(packet_data).encode("utf-8")
-        encrypted_packet = self.ecdh(packet_cft_bytes)
         
+        return "hello world".encode("utf-8")
+        # packet_cft_bytes = json.dumps(packet_data).encode("utf-8")
+        # encrypted_packet = self.ecdh(packet_cft_bytes)
+        # return encrypted_packet
         #signin the encrypted pkt
-        signed_certificate = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
-        # check len opf signed certificate
-        print("signed certificate len: ", len(signed_certificate))
-        print("signed certificate: ", signed_certificate)
-        import time 
-        time.sleep(5)
-        return signed_certificate + encrypted_packet
+        # signed_certificate = self.signature_private_key.sign(encrypted_packet, ec.ECDSA(hashes.SHA256()))
+        # # check len opf signed certificate
+        # print("signed certificate len: ", len(signed_certificate))
+        # print("signed certificate: ", signed_certificate)
+        # import time 
+        # time.sleep(5)
+        # final_packet = {
+        #     "signed_certificate": base64.b64encode(signed_certificate).decode("utf-8"),
+        #     "encrypted_packet": base64.b64encode(encrypted_packet).decode("utf-8")
+        # }
+        # return signed_certificate + encrypted_packet
 
 
 def main():
