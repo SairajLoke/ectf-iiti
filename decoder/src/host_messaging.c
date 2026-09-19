@@ -193,6 +193,9 @@ int read_packet(msg_type_t* cmd, void *buf, uint16_t *len) {
     if (header.cmd != ACK_MSG) {
         write_ack();  // ACK the header
         if (header.len && buf != NULL) {
+            if (header.len > UART_BUFFER_SIZE) {        
+                return -1;                                
+            }                                              
             if (read_bytes(buf, header.len) < 0) {
                 return -1;
             }
