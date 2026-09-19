@@ -783,7 +783,6 @@ for (int i = 0; i < sizeof(MAP_CHANNEL_KEY); i++){
 void get_channel_key(channel_id_t channel, uint8_t *key) {
     // This function should retrieve the key for the specified channel
     // For example, it could look up the key in a predefined array or database
-    // Here, we just set it to a dummy value for demonstration purposes
     print_debug("fetching key for channel :");
     int2str(channel);
     //todo invalidate the channel
@@ -792,33 +791,19 @@ void get_channel_key(channel_id_t channel, uint8_t *key) {
     //     key[i] = 0x00;
     // }
 
-    for (int i=0; i<sizeof(VALID_CHANNELS); i++){
-        if (VALID_CHANNELS[i] == channel){
-            memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
-            break;
-        }
+    void get_channel_key(channel_id_t channel, uint8_t *key) {
+    switch (channel) {
+        case 1: memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY)); break;
+        case 2: memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY)); break;
+        case 3: memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY)); break;
+        case 4: memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY)); break;
+        case 5: memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY)); break;
+        case 6: memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY)); break;
+        case 7: memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY)); break;
+        case 8: memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY)); break;
+        default: memset(key, 0, CHANNEL_KEY_SIZE); break;
     }
-
-    // if (channel == 1) {
-    //     memcpy(key, CHANNEL_1_KEY, sizeof(CHANNEL_1_KEY));
-    // } else if (channel == 2){
-    //     memcpy(key, CHANNEL_2_KEY, sizeof(CHANNEL_2_KEY));
-    // } else if (channel == 3){
-    //     memcpy(key, CHANNEL_3_KEY, sizeof(CHANNEL_3_KEY));
-    // } else if (channel == 4){
-    //     memcpy(key, CHANNEL_4_KEY, sizeof(CHANNEL_4_KEY));
-    // } else if (channel == 5){
-    //     memcpy(key, CHANNEL_5_KEY, sizeof(CHANNEL_5_KEY));
-    // } else if (channel == 6){
-    //     memcpy(key, CHANNEL_6_KEY, sizeof(CHANNEL_6_KEY));
-    // } else if (channel == 7){
-    //     memcpy(key, CHANNEL_7_KEY, sizeof(CHANNEL_7_KEY));
-    // } else if (channel == 8){
-    //     memcpy(key, CHANNEL_8_KEY, sizeof(CHANNEL_8_KEY));
-    // } else {
-    //     // Invalid channel, set key to zero
-    //     memset(key, 0, sizeof(CHANNEL_1_KEY));
-    // }
+}
 
 
 }
