@@ -339,3 +339,6 @@ wolfssl/
 msdk/
 *.secrets
 *.subscription
+secrets/secrets.json
+decoder/inc/secrets.h
+*.sub
