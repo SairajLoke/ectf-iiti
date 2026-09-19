@@ -210,7 +210,7 @@ void int2str(int num) {
 }
 int perform_checks(channel_id_t channel, timestamp_t timestamp){
     // checking all the channel conditions and timestamp conditions before decrypting the frame.
-    if (channel > MAX_CHANNEL_COUNT)
+    if (channel >= MAX_CHANNEL_COUNT)
     {
         STATUS_LED_RED();
         print_error("Invalid channel number\n");
@@ -337,7 +337,7 @@ int update_subscription(subscription_update_packet_t *update)
 
 
     // Check that the channel is valid
-    if (update->channel > MAX_CHANNEL_COUNT)
+    if (update->channel >= MAX_CHANNEL_COUNT)
     {
         STATUS_LED_RED();
         print_error("Invalid channel number\n");
