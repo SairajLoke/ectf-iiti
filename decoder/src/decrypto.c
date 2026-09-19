@@ -124,7 +124,8 @@ int ecdh_decrypt(
     }
 
     // Decode the private key from DER format
-    ret = wc_EccPrivateKeyDecode(derPriv, NULL, &myKey, derPrivSz);
+  word32 privIdx = 0;
+    ret = wc_EccPrivateKeyDecode(derPriv, &privIdx, &myKey, derPrivSz);
     if (ret != 0)
     {
         printf("Private key decode failed: %d\n", ret);
@@ -141,7 +142,8 @@ int ecdh_decrypt(
     }
 
     // Decode the public key from DER format
-    ret = wc_EccPublicKeyDecode(derPub, NULL, &peerKey, derPubSz);
+  word32 pubIdx = 0;
+    ret = wc_EccPublicKeyDecode(derPub, &pubIdx, &peerKey, derPubSz);
     if (ret != 0)
     {
         printf("Public key decode failed: %d\n", ret);
