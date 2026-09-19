@@ -232,7 +232,6 @@ int perform_checks(channel_id_t channel, timestamp_t timestamp){
     {
         STATUS_LED_RED();
         print_error("Invalid timestamp\n");
-        prev_timestamp= timestamp;
         return -1;
     }
     prev_timestamp= timestamp;
